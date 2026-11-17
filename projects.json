@@ -1,0 +1,122 @@
+{
+  "_note": "Hand-edited. null = not filled in yet (the site shows a dash). status: active | paused | retired.",
+  "projects": [
+    {
+      "repo": "gauntlet",
+      "description": "Whiteboard with live widgets (Boardkit, Linkkit, Slate); home of the other apps' routes",
+      "url": "https://gauntlet-home.vercel.app",
+      "status": "active",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "boardkit",
+      "description": "Visual board with lists and cards, drag and drop; widget in gauntlet",
+      "url": "https://gauntlet-home.vercel.app/boardkit",
+      "status": "active",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "linkkit",
+      "description": "Connections / dependencies widget; bridge between Boardkit, Treekit and gauntlet",
+      "url": "https://gauntlet-home.vercel.app/linkkit",
+      "status": "active",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "calendarkit",
+      "description": "NBA schedule for each team and the league, plus Slate",
+      "url": "https://gauntlet-home.vercel.app/calendar",
+      "status": "active",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "footykit",
+      "description": "Football app (calendars, lists, cups, Slate)",
+      "url": "https://gauntlet-home.vercel.app/football",
+      "status": "active",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "statmuse-builder",
+      "description": "Builds NBA stat questions for StatMuse",
+      "url": "https://statmuse-builder.vercel.app",
+      "status": "active",
+      "devices": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "repo": "rotationkit",
+      "description": "NBA game rotation viewer: who was on court and when",
+      "url": null,
+      "status": "active",
+      "devices": [
+        "desktop",
+        "mobile"
+      ]
+    },
+    {
+      "repo": "selfchat",
+      "description": "Chats with yourself (built with Codex, not Claude Code)",
+      "url": null,
+      "status": "active",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "rankkit",
+      "description": "2x2 priority matrix -> buckets -> ordered list",
+      "url": "https://rankkit-nine.vercel.app",
+      "status": null,
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "treekit",
+      "description": "Tree app, retired in favour of Linkkit, kept online as a backup",
+      "url": "https://treekit.vercel.app",
+      "status": "retired",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "vennkit",
+      "description": "Venn widget, paused",
+      "url": null,
+      "status": "paused",
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "excalidraw-slideshow",
+      "description": "Presents .excalidraw boards as slides",
+      "url": null,
+      "status": null,
+      "devices": [
+        "desktop"
+      ]
+    },
+    {
+      "repo": "halftime-timer",
+      "description": null,
+      "url": null,
+      "status": null,
+      "devices": null
+    }
+  ]
+}
