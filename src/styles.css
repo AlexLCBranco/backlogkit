@@ -72,3 +72,10 @@ ul.built li { margin: 3px 0; }
 .hit summary .muted { margin-right: 6px; }
 
 .site-version { position: fixed; right: 8px; bottom: 6px; font-size: 11px; color: var(--muted); opacity: 0.7; pointer-events: auto; user-select: none; }
+
+/* Copy buttons (BL-3): small, always visible, never toggle the row they sit in. */
+button.copy { display: inline-flex; align-items: center; justify-content: center; vertical-align: -2px; width: 22px; height: 20px; margin-left: 6px; padding: 0; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
+button.copy:hover { color: var(--text); border-color: var(--line); background: var(--panel-2); }
+button.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.copy.copied { color: var(--ok); }
+h2 button.copy { vertical-align: -3px; }

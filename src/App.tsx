@@ -5,6 +5,8 @@ import type { Data, Project, Section, BuiltDay } from './types';
 import { search, type Hit } from './search';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
+import { CopyButton } from './CopyButton';
+import { backlogMarkdown, itemMarkdown } from '../lib/lists.mjs';
 
 export type Route = { page: 'home' } | { page: 'project'; repo: string } | { page: 'all' };
 
@@ -118,6 +120,7 @@ function PlannedList({ sections, empty }: { sections: Section[]; empty: string }
             <details key={`${i.id ?? ''}-${n}`} className={`item${i.blocked ? ' is-blocked' : ''}`} data-testid="planned-item">
               <summary>
                 {i.id && <span className="id">{i.id}</span>} {i.title}
+                <CopyButton text={itemMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
                 {i.blocked && <span className="badge blocked">Blocked</span>}
               </summary>
               <div className="body">{i.body || DASH}</div>
@@ -140,6 +143,7 @@ function BuiltList({ days, empty }: { days: BuiltDay[]; empty: string }) {
             {d.items.map((i, n) => (
               <li key={n}>
                 {i.id && <span className="id">{i.id}</span>} {i.title}
+                <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
                 {i.detail && <div className="muted detail">{i.detail}</div>}
               </li>
             ))}
@@ -156,7 +160,9 @@ export function ProjectPage({ p }: { p: Project }) {
       <Card p={p} />
       <div className="columns">
         <section data-testid="planned">
-          <h2>Planned</h2>
+          <h2>
+            Planned {backlogMarkdown(p.planned) && <CopyButton text={backlogMarkdown(p.planned)} label="Copy whole backlog" />}
+          </h2>
           <PlannedList sections={p.planned} empty={p.files.backlog ? 'Nothing planned.' : 'No FEATURE_BACKLOG.md.'} />
         </section>
         <section data-testid="built">
@@ -197,7 +203,8 @@ export function AllRepos({ data }: { data: Data }) {
         {withPlans.map((p) => (
           <div key={p.repo} className="repo-block">
             <h3>
-              <a href={hrefOf({ page: 'project', repo: p.repo })}>{p.repo}</a>
+              <a href={hrefOf({ page: 'project', repo: p.repo })}>{p.repo}</a>{' '}
+              <CopyButton text={backlogMarkdown(p.planned)} label={`Copy whole ${p.repo} backlog`} />
             </h3>
             <PlannedList sections={p.planned.filter((s) => s.items.length)} empty="" />
           </div>
@@ -219,6 +226,7 @@ export function AllRepos({ data }: { data: Data }) {
                     {r.items.map((i, n) => (
                       <li key={n}>
                         {i.id && <span className="id">{i.id}</span>} {i.title}
+                        <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
                         {i.detail && <div className="muted detail">{i.detail}</div>}
                       </li>
                     ))}

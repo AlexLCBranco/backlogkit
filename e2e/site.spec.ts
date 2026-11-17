@@ -3,6 +3,7 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fixtureData } from './fixture-data';
+import { backlogMarkdown } from '../lib/lists.mjs';
 
 const live = !!process.env.LIVE_URL;
 const pkgVersion = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
@@ -42,6 +43,34 @@ test.describe('mocked GitHub', () => {
 
     await page.getByRole('link', { name: 'All repos' }).click();
     await expect(page.getByTestId('all-built-day').first()).toContainText('2026-11-17');
+  });
+
+  test('copy buttons: one item, a built item and the whole backlog, without toggling rows', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const clipboard = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'); // Windows' clipboard reads back CRLF
+    const data = await fixtureData();
+    await page.goto('/#/p/demo');
+    const row = page.getByTestId('planned').getByTestId('planned-item').first();
+    const copy = row.getByRole('button', { name: 'Copy DM-1' });
+    await expect(copy).toBeVisible(); // always visible, no hover needed
+
+    await copy.click();
+    await expect(copy).toHaveAttribute('data-copied', 'true');
+    expect(await clipboard()).toBe('### DM-1 — First thing\nLine one of the spec.\n- a bullet\n  continued');
+    await expect(row).not.toHaveAttribute('open');
+    await expect(copy).not.toHaveAttribute('data-copied', /.*/, { timeout: 3000 }); // back to the copy icon
+
+    await row.locator('summary').click({ position: { x: 5, y: 5 } });
+    await expect(row).toHaveAttribute('open');
+    await copy.click();
+    await expect(row).toHaveAttribute('open'); // an open row stays open
+
+    await page.getByTestId('built').getByRole('button', { name: 'Copy DM-5' }).click();
+    expect(await clipboard()).toBe('- DM-5 — Newest thing (v1.3.0)\n  What the owner sees now.');
+
+    await page.getByRole('button', { name: 'Copy whole backlog' }).click();
+    expect(await clipboard()).toBe(backlogMarkdown(data.projects.find((p) => p.repo === 'demo')!.planned));
+    expect(await clipboard()).toMatch(/^## Ready\n\n### DM-1[\s\S]*\n## Held[\s\S]*### DM-3 — Later thing\nHeld text.\n$/);
   });
 
   test('the token never reaches the page', async ({ page }) => {

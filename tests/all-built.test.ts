@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadAll } from '../lib/github.mjs';
 // @ts-expect-error plain JS script, no types
-import { allBacklog, allBuilt, itemMarkdown } from '../scripts/all-built.mjs';
+import { allBacklog, allBuilt } from '../scripts/all-built.mjs';
+import { itemMarkdown } from '../lib/lists.mjs';
 import { BACKLOG, BUILT, mockGithub, projectsJson } from './fixtures';
 
 const load = (token?: string) =>
