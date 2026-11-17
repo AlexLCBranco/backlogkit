@@ -38,7 +38,7 @@ h4 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); text-transform: n
 .card.clickable:hover { border-color: #3d4556; background: var(--panel-2); }
 .card header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .card .desc { margin: 4px 0 8px; }
-.card dl { display: grid; grid-template-columns: 78px 1fr; gap: 2px 10px; margin: 0 0 8px; font-size: 13px; }
+.card dl { display: grid; grid-template-columns: 112px 1fr; gap: 2px 10px; margin: 0 0 8px; font-size: 13px; }
 .card dt { color: var(--muted); }
 .card dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .counts { margin: 0; font-size: 13px; border-top: 1px solid var(--line); padding-top: 8px; }
@@ -79,3 +79,7 @@ button.copy:hover { color: var(--text); border-color: var(--line); background: v
 button.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 button.copy.copied { color: var(--ok); }
 h2 button.copy { vertical-align: -3px; }
+
+/* Sort dropdown above the cards (BL-4). */
+.home .sort { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.home .sort select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }

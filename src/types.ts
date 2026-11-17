@@ -10,7 +10,8 @@ export interface Project {
   status: string | null;
   devices: string[] | null;
   inProjectsJson: boolean;
-  github: { url: string; private: boolean; pushedAt: string | null; defaultBranch: string | null; archived: boolean } | null;
+  github: { url: string; private: boolean; pushedAt: string | null; createdAt: string | null; defaultBranch: string | null; archived: boolean } | null;
+  backlogChangedAt: string | null;
   warning: string | null;
   error: string | null;
   files: { backlog: boolean; built: boolean; ideas: boolean };

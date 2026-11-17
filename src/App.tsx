@@ -6,6 +6,7 @@ import { search, type Hit } from './search';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
+import { SORT_OPTIONS, loadSort, saveSort, sortProjects, type SortKey } from './sort';
 import { backlogMarkdown, itemMarkdown } from '../lib/lists.mjs';
 
 export type Route = { page: 'home' } | { page: 'project'; repo: string } | { page: 'all' };
@@ -66,6 +67,8 @@ export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
         <dd>{dash(p.devices?.join(', '))}</dd>
         <dt>Last push</dt>
         <dd>{dash(day(p.github?.pushedAt ?? null))}</dd>
+        <dt>Backlog changed</dt>
+        <dd data-testid="backlog-changed">{dash(day(p.backlogChangedAt))}</dd>
         <dt>Version</dt>
         <dd>{dash(p.latestVersion && `v${p.latestVersion}`)}</dd>
         <dt>Last built</dt>
@@ -86,10 +89,29 @@ export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
 }
 
 export function Home({ data, go }: { data: Data; go: (r: Route) => void }) {
+  const [sort, setSort] = useState<SortKey>(loadSort);
   return (
     <div className="home">
+      <label className="sort">
+        Sort{' '}
+        <select
+          aria-label="Sort projects"
+          value={sort}
+          onChange={(e) => {
+            const key = e.target.value as SortKey;
+            setSort(key);
+            saveSort(key);
+          }}
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
       {STATUS_GROUPS.map((g) => {
-        const list = data.projects.filter(g.test);
+        const list = sortProjects(data.projects.filter(g.test), sort);
         if (!list.length) return null;
         return (
           <section key={g.key} data-testid={`group-${g.key}`}>

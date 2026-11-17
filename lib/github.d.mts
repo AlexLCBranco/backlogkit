@@ -11,7 +11,8 @@ export interface LoadedProject {
   status: string | null
   devices: string[] | null
   inProjectsJson: boolean
-  github: { url: string; private: boolean; pushedAt: string | null; defaultBranch: string | null; archived: boolean } | null
+  github: { url: string; private: boolean; pushedAt: string | null; createdAt: string | null; defaultBranch: string | null; archived: boolean } | null
+  backlogChangedAt: string | null
   warning: string | null
   error: string | null
   files: { backlog: boolean; built: boolean; ideas: boolean }
@@ -27,7 +28,8 @@ export interface LoadedProject {
 export interface Loaded { generatedAt: string; tokenSet: boolean; owner: string; problems: string[]; projects: LoadedProject[] }
 
 export function makeGithub(opts?: { token?: string; fetchImpl?: typeof fetch }): {
-  repos(): Promise<Array<{ name: string; html_url: string; private: boolean; pushed_at?: string; default_branch?: string; archived?: boolean }>>
+  repos(): Promise<Array<{ name: string; html_url: string; private: boolean; pushed_at?: string; created_at?: string; default_branch?: string; archived?: boolean }>>
+  lastCommitDate(repo: string, path: string, ref?: string | null): Promise<string | null>
   file(repo: string, path: string, ref?: string | null): Promise<string | null>
 }
 export function compareProjects(a: LoadedProject, b: LoadedProject): number

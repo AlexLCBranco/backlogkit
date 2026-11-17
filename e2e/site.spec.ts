@@ -73,6 +73,28 @@ test.describe('mocked GitHub', () => {
     expect(await clipboard()).toMatch(/^## Ready\n\n### DM-1[\s\S]*\n## Held[\s\S]*### DM-3 — Later thing\nHeld text.\n$/);
   });
 
+  test('sort dropdown reorders the cards in each group and survives a reload', async ({ page }) => {
+    await page.goto('/');
+    const active = page.getByTestId('group-active');
+    const names = () => active.locator('.card').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')!.slice(5)));
+    const sort = page.getByRole('combobox', { name: 'Sort projects' });
+    await expect(sort).toHaveValue('backlog-desc'); // default
+    await expect.poll(names).toEqual(['alpha', 'demo', 'zulu', 'broken']); // unknown date (broken) last
+    await expect(page.getByTestId('card-demo').getByTestId('backlog-changed')).toHaveText('2026-11-16');
+    await expect(page.getByTestId('card-broken').getByTestId('backlog-changed')).toHaveText('—');
+
+    await sort.selectOption('name-desc');
+    await expect.poll(names).toEqual(['zulu', 'demo', 'broken', 'alpha']);
+    await sort.selectOption({ label: 'Created — oldest first' });
+    await expect.poll(names).toEqual(['alpha', 'demo', 'broken', 'zulu']); // broken: the mock's default 2026-01-01
+    await sort.selectOption('backlog-asc');
+    await expect.poll(names).toEqual(['zulu', 'demo', 'alpha', 'broken']);
+
+    await page.reload();
+    await expect(page.getByRole('combobox', { name: 'Sort projects' })).toHaveValue('backlog-asc');
+    await expect.poll(names).toEqual(['zulu', 'demo', 'alpha', 'broken']);
+  });
+
   test('the token never reaches the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('card-demo')).toBeVisible();

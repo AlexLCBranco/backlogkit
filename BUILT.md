@@ -4,6 +4,8 @@ Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never 
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
 
 ## 2026-11-17
+- BL-4 — Sort the project cards (v1.2.0)
+  A Sort dropdown above the cards orders each group by backlog changed, last change, created or name (either direction; default backlog changed, newest first), remembered in this browser; each card shows its Backlog changed date.
 - BL-3 — Copy buttons: one per feature, one for the whole backlog (v1.1.0)
   Every planned and built item has a small copy icon beside its title that copies it as Markdown (heading and full text), and Planned has one that copies the whole backlog; the icon turns into a checkmark for a moment.
 - BL-2 — Move the all-repos built list here from gauntlet (v1.0.0)

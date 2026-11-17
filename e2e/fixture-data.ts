@@ -4,12 +4,24 @@ import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from '../tests/fixtur
 
 export async function fixtureData() {
   const { fetchImpl } = mockGithub({
-    repos: [{ name: 'demo' }, { name: 'broken', private: true }, { name: 'bare' }],
-    files: { demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS } },
+    repos: [
+      { name: 'demo', backlog_changed: '2026-11-16T10:00:00Z', created_at: '2025-01-01T00:00:00Z' },
+      { name: 'broken', private: true },
+      { name: 'bare' },
+      { name: 'alpha', backlog_changed: '2026-11-17T10:00:00Z', created_at: '2024-01-01T00:00:00Z' },
+      { name: 'zulu', backlog_changed: '2026-11-10T10:00:00Z', created_at: '2026-06-01T00:00:00Z' },
+    ],
+    files: {
+      demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS },
+      alpha: { 'FEATURE_BACKLOG.md': '## Ready\n\n### AL-1 — Alpha item\nText.\n' },
+      zulu: { 'FEATURE_BACKLOG.md': '## Ready\n' },
+    },
     fails: { broken: 403 },
     projectsJson: projectsJson([
       { repo: 'demo', description: 'Demo app', url: 'https://demo.vercel.app', status: 'active', devices: ['desktop'] },
       { repo: 'broken', description: 'Locked away', url: null, status: 'active', devices: ['desktop'] },
+      { repo: 'alpha', description: 'First by name', url: null, status: 'active', devices: null },
+      { repo: 'zulu', description: 'Last by name', url: null, status: 'active', devices: null },
     ]),
   });
   return loadAll({ token: 'e2e-secret-token-value', fetchImpl });

@@ -48,9 +48,10 @@ Never built from directly.
   that wraps (2026-11-02)
 `;
 
-export interface Repo { name: string; private?: boolean; pushed_at?: string; default_branch?: string }
+// backlog_changed: the date the commits API answers for FEATURE_BACKLOG.md (none → an empty list).
+export interface Repo { name: string; private?: boolean; pushed_at?: string; created_at?: string; default_branch?: string; backlog_changed?: string }
 export type Files = Record<string, Record<string, string>>; // repo → path → text
-export type Fails = Record<string, number>; // repo (or "list", "projects") → HTTP status
+export type Fails = Record<string, number>; // repo (or "list", "projects", "commits:<repo>") → HTTP status
 
 export function mockGithub({ repos, files, fails = {}, projectsJson }: { repos: Repo[]; files: Files; fails?: Fails; projectsJson?: string }) {
   const calls: { url: string; headers: Record<string, string> }[] = [];
@@ -63,9 +64,17 @@ export function mockGithub({ repos, files, fails = {}, projectsJson }: { repos: 
       const page = Number(new URL(url).searchParams.get('page') ?? 1);
       const list =
         page === 1
-          ? repos.map((r) => ({ name: r.name, html_url: `https://github.com/AlexLCBranco/${r.name}`, private: !!r.private, pushed_at: r.pushed_at ?? '2026-11-17T10:00:00Z', default_branch: r.default_branch ?? 'main', owner: { login: 'AlexLCBranco' } }))
+          ? repos.map((r) => ({ name: r.name, html_url: `https://github.com/AlexLCBranco/${r.name}`, private: !!r.private, pushed_at: r.pushed_at ?? '2026-11-17T10:00:00Z', created_at: r.created_at ?? '2026-01-01T00:00:00Z', default_branch: r.default_branch ?? 'main', owner: { login: 'AlexLCBranco' } }))
           : [];
       return text(JSON.stringify(list));
+    }
+    const c = url.match(/api\.github\.com\/repos\/AlexLCBranco\/([^/]+)\/commits\?(.*)$/);
+    if (c) {
+      const repo = c[1]!;
+      if (fails[`commits:${repo}`]) return text('{}', fails[`commits:${repo}`]);
+      if (new URLSearchParams(c[2]).get('path') !== 'FEATURE_BACKLOG.md') return text('unexpected path', 500);
+      const date = repos.find((r) => r.name === repo)?.backlog_changed;
+      return text(JSON.stringify(date ? [{ commit: { committer: { date } } }] : []));
     }
     const m = url.match(/api\.github\.com\/repos\/AlexLCBranco\/([^/]+)\/contents\/([^?]+)/) ?? url.match(/raw\.githubusercontent\.com\/AlexLCBranco\/([^/]+)\/[^/]+\/(.+)$/);
     if (m) {

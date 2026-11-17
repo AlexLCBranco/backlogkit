@@ -67,3 +67,28 @@ describe('loadAll: projects.json merged with GitHub', () => {
     }
   });
 });
+
+describe('dates for sorting (BL-4)', () => {
+  const dated = [
+    { name: 'demo', created_at: '2025-05-05T00:00:00Z', backlog_changed: '2026-11-16T08:00:00Z' },
+    { name: 'stray' },
+    { name: 'empty' },
+  ];
+  it('backlog-changed date from the last commit touching FEATURE_BACKLOG.md, creation date from the repo list', async () => {
+    const { d, calls } = await load({ repos: dated, files });
+    const demo = d.projects.find((p) => p.repo === 'demo')!;
+    expect(demo.backlogChangedAt).toBe('2026-11-16T08:00:00Z');
+    expect(demo.github!.createdAt).toBe('2025-05-05T00:00:00Z');
+    expect(calls.filter((c) => c.url.includes('/commits?'))).toHaveLength(1); // only repos with a backlog ask
+    expect(calls.find((c) => c.url.includes('/commits?'))!.url).toContain('path=FEATURE_BACKLOG.md&per_page=1&sha=main');
+    expect(d.projects.find((p) => p.repo === 'stray')!.backlogChangedAt).toBeNull();
+  });
+  it('a failed date request leaves a dash and a notice, not a broken card', async () => {
+    const { d } = await load({ repos: dated, files, fails: { 'commits:demo': 403 }, projectsJson: projectsJson([]) });
+    const demo = d.projects.find((p) => p.repo === 'demo')!;
+    expect(demo.backlogChangedAt).toBeNull();
+    expect(demo.error).toBeNull();
+    expect(demo.counts.planned).toBe(3);
+    expect(d.problems).toEqual(['Backlog-changed dates not read (they show as a dash): demo (demo commits: HTTP 403 (no access or rate limit))']);
+  });
+});
