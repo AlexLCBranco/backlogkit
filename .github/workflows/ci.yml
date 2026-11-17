@@ -1,0 +1,55 @@
+# Tests on every push and pull request: the lists and version check, unit tests, typecheck + build, and the e2e
+# against the built site (GitHub mocked). After a push to main, the same e2e's live parts run against the deployed site
+# once Vercel shows this commit's version.
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2 # check-version compares HEAD with its parent
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check-version
+        if: github.event_name == 'push'
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+
+  live:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.LIVE_URL != ''
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Wait for this version on the live site
+        run: |
+          want=$(node -p "require('./package.json').version")
+          for i in $(seq 60); do
+            got=$(curl -fsS "${{ vars.LIVE_URL }}/version.json" | node -pe "JSON.parse(require('fs').readFileSync(0)).version" 2>/dev/null || true)
+            [ "$got" = "$want" ] && exit 0
+            sleep 10
+          done
+          echo "live site still at $got, wanted $want"; exit 1
+      - run: npx playwright test
+        env:
+          LIVE_URL: ${{ vars.LIVE_URL }}
