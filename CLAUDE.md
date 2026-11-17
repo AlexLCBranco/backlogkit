@@ -38,6 +38,8 @@ never reused. Work shipped without a backlog item (a direct request, a fix) gets
 `- title (v<version>)`. Housekeeping the owner can't see (handoff notes, pins, test-only or CI fixes, docs) goes under a
 `### Internal` subheading at the bottom of that day, not in the main list. The same format is used in every one of
 the owner's repos, so they can be merged into one `ALL_BUILT.md`.
+`ALL_BUILT.md` and `ALL_BACKLOG.md` are generated here by `scripts/all-built.mjs` (the `all-built` workflow, daily and on
+demand) from every repo on GitHub plus `projects.json`. Never edit them by hand.
 Follow this file's other rules (branches, tests, version bump) as usual.
 
 When the owner mentions something that isn't to be built now (an aside, "later", "someday", "maybe"), add it at the

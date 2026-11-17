@@ -1,0 +1,30 @@
+# Rebuilds ALL_BUILT.md and ALL_BACKLOG.md (scripts/all-built.mjs) daily and on demand (Actions tab → all-built →
+# Run workflow). Moved here from gauntlet (BL-2).
+name: all-built
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/all-built.mjs
+        env:
+          # A fine-grained token with Contents: read on the owner's repos (private ones included). Without it, only
+          # public repos are read and private ones are listed under "Not read this run".
+          ALL_BUILT_TOKEN: ${{ secrets.ALL_BUILT_TOKEN }}
+      - run: |
+          git diff --quiet ALL_BUILT.md ALL_BACKLOG.md && git ls-files --error-unmatch ALL_BUILT.md ALL_BACKLOG.md >/dev/null 2>&1 && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898728+github-actions[bot]@users.noreply.github.com"
+          git add ALL_BUILT.md ALL_BACKLOG.md
+          git commit -m "ALL_BUILT.md, ALL_BACKLOG.md: daily merge of every repo's lists"
+          git push
