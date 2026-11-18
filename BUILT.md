@@ -4,6 +4,8 @@ Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never 
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
 
 ## 2026-11-18
+- BL-7 — Ideas page: every repo's ideas in one place, plus ideas with no repo (v1.5.0)
+  A new Ideas tab lists every repo's ideas grouped by repo, each with a copy button, after an Unassigned group read from the new UNASSIGNED_IDEAS.md; search finds those too.
 - BL-6 — Browser tab title follows the page (v1.4.0)
   The tab title says what's open: "backlogkit · calendarkit backlog" on a project page, "backlogkit · All repos", "backlogkit · Projects", or the search.
 - BL-5 — Real logo (v1.3.0)

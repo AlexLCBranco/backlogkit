@@ -3,6 +3,7 @@ import type { BuiltDay, Counts, Idea, Section } from './lists.mjs'
 export const OWNER: string
 export const SELF: string
 export const FILES: { backlog: string; built: string; ideas: string }
+export const UNASSIGNED: string
 
 export interface LoadedProject {
   repo: string
@@ -25,7 +26,7 @@ export interface LoadedProject {
   counts: Counts
 }
 
-export interface Loaded { generatedAt: string; tokenSet: boolean; owner: string; problems: string[]; projects: LoadedProject[] }
+export interface Loaded { generatedAt: string; tokenSet: boolean; owner: string; problems: string[]; unassigned: { file: boolean; ideas: Idea[] }; projects: LoadedProject[] }
 
 export function makeGithub(opts?: { token?: string; fetchImpl?: typeof fetch }): {
   repos(): Promise<Array<{ name: string; html_url: string; private: boolean; pushed_at?: string; created_at?: string; default_branch?: string; archived?: boolean }>>

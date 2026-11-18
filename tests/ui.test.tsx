@@ -12,7 +12,7 @@ let data: Data;
 beforeAll(async () => {
   const { fetchImpl } = mockGithub({
     repos: [{ name: 'demo' }, { name: 'other' }, { name: 'broken', private: true }, { name: 'bare' }],
-    files: { demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS }, other: { 'FEATURE_BACKLOG.md': '## Ready\n\n### OT-10 — Other ten\nmentions DM-1 in passing\n', 'BUILT.md': '## 2026-11-17\n- OT-1 — Other built (v2.0.0)\n' } },
+    files: { demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS }, other: { 'FEATURE_BACKLOG.md': '## Ready\n\n### OT-10 — Other ten\nmentions DM-1 in passing\n', 'BUILT.md': '## 2026-11-17\n- OT-1 — Other built (v2.0.0)\n', 'IDEAS.md': '# Ideas\n\nNone yet.\n' }, backlogkit: { 'UNASSIGNED_IDEAS.md': '# Unassigned\n\n- U-1 — Orphan gadget (2026-11-18)\n' } },
     fails: { broken: 403 },
     projectsJson: projectsJson([
       { repo: 'demo', description: 'Demo app', url: 'https://demo.vercel.app', status: 'active', devices: ['desktop'] },
@@ -102,11 +102,40 @@ describe('search', () => {
   });
 });
 
+describe('ideas page (BL-7)', () => {
+  it('shows Unassigned first, then each repo with ideas, linked; repos without ideas left out', () => {
+    show('#/ideas');
+    const blocks = screen.getAllByTestId(/^ideas-/).map((b) => b.dataset.testid);
+    expect(blocks).toEqual(['ideas-unassigned', 'ideas-demo']); // other has an IDEAS.md with no items
+    expect(within(screen.getByTestId('ideas-unassigned')).getAllByTestId('idea').map((i) => i.textContent)).toEqual(['U-1 Orphan gadget (2026-11-18)']);
+    const demo = screen.getByTestId('ideas-demo');
+    expect(within(demo).getByRole('link', { name: 'demo' }).getAttribute('href')).toBe('#/p/demo');
+    expect(within(demo).getAllByTestId('idea')).toHaveLength(2);
+    expect(within(demo).getByRole('button', { name: 'Copy I-1' })).toBeTruthy();
+  });
+  it('never shows ideas inside Planned or Built', () => {
+    show('#/all');
+    expect(screen.getByTestId('all-planned').textContent).not.toContain('Dark mode toggle');
+    expect(screen.getByTestId('all-built').textContent).not.toContain('Dark mode toggle');
+  });
+  it('an empty Unassigned group says so', () => {
+    render(<View data={{ ...data, unassigned: { file: true, ideas: [] } }} route={{ page: 'ideas' }} q="" go={() => {}} />);
+    expect(screen.getByTestId('ideas-unassigned').textContent).toContain('No unassigned ideas.');
+  });
+  it('search finds Unassigned ideas by ID and text', () => {
+    expect(search(data.projects, 'U-1', data.unassigned.ideas).map((h) => [h.repo, h.kind, h.where])).toEqual([[null, 'idea', 'Unassigned']]);
+    expect(search(data.projects, 'orphan', data.unassigned.ideas).map((h) => h.id)).toEqual(['U-1']);
+    show('#/?q=orphan');
+    expect(screen.getByTestId('hit').textContent).toMatch(/Unassigned.*Idea.*U-1.*Orphan gadget/);
+  });
+});
+
 describe('tab title', () => {
   it('names what is open', () => {
     expect(titleOf({ page: 'home' })).toBe('backlogkit · Projects');
     expect(titleOf({ page: 'project', repo: 'calendarkit' })).toBe('backlogkit · calendarkit backlog');
     expect(titleOf({ page: 'all' })).toBe('backlogkit · All repos');
+    expect(titleOf({ page: 'ideas' })).toBe('backlogkit · Ideas');
     expect(titleOf({ page: 'all' }, '  dark ')).toBe('backlogkit · search “dark”');
   });
 });

@@ -8,21 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-### BL-7 — Ideas page: every repo's ideas in one place, plus ideas with no repo
-**What:** a top-level **Ideas** tab in the header, next to All repos (`#/ideas`).
-- Lists every project's `IDEAS.md` items, grouped by repo (repo name links to the project page), each with its copy
-  button, like Planned in All repos. Repos with no ideas are left out.
-- A first group, **Unassigned**, for ideas that belong to no repo yet. They live in a new file in this repo,
-  `UNASSIGNED_IDEAS.md`, same line format as `IDEAS.md` but with their own IDs: `- U-1 — the idea (YYYY-MM-DD)`.
-  Create the file with a short header like `IDEAS.md`'s, and no items.
-- Ideas stay separate from planned and built everywhere: never shown inside Planned or Built.
-- Search already covers ideas; make Unassigned ideas searchable too.
-- Add `UNASSIGNED_IDEAS.md` to the rules in CLAUDE.md ("Feature backlog, built list and ideas"): an idea from the
-  owner that fits no repo goes there; "assign U-n to <repo>" moves it to the bottom of that repo's `IDEAS.md` with the
-  next free I ID and a `From U-n` line.
-**Tests:** unit: parsing `UNASSIGNED_IDEAS.md` (empty file, missing file, items). e2e: Ideas tab shows the Unassigned
-group and per-repo groups from fixture data, repos without ideas are absent, copy button works, search finds a U-n idea.
-
 ### BL-8 — Time estimates: build time and local test suite time
 **What:** the owner wants to know roughly how long each planned item will take before running it.
 - Each planned item can carry a line `**Estimate:** build ~N min · suite ~M min` (build = a Claude Code session building

@@ -13,6 +13,8 @@ Three lists, never mixed:
   "next", "queued" or "plan" sections in other docs are history, not the plan.
 - `BUILT.md`: shipped work only, newest first.
 - `IDEAS.md`: ideas the owner mentioned that are not planned (maybe later, maybe never). Never built from directly.
+- `UNASSIGNED_IDEAS.md` (this repo only): ideas from the owner that fit no repo yet, as `- U-n — the idea (YYYY-MM-DD)`
+  (own U IDs, never reused). Shown first on the site's Ideas page. Never built from directly.
 
 The owner's messages. Always read the lists from `main` on GitHub, never from your local checkout or branch
 (Claude Code sessions run on a branch made at session start, so `git pull` there does NOT bring in backlog
@@ -26,6 +28,8 @@ items added later): run `git fetch origin main`, then read with `git show origin
 - "what's built" / "what shipped" (maybe "since <date>" or "last N"): read `BUILT.md` only and list it.
 - "ideas" / "what ideas": read `IDEAS.md` only and list it as `I-n — idea`.
 - "next batch" / "build the backlog": every item, top to bottom. "next": the top item only. "build BL-n": that item only.
+- "assign U-n to <repo>": cut it from `UNASSIGNED_IDEAS.md` and add it at the bottom of that repo's `IDEAS.md` with the
+  next free I ID and a `From U-n` line.
 - "promote I-n": cut it from `IDEAS.md` and add it at the bottom of Ready in `FEATURE_BACKLOG.md` with the next free
   BL ID and a `From I-n` line. Build it only if the owner also asks for that.
 
@@ -44,7 +48,8 @@ Follow this file's other rules (branches, tests, version bump) as usual.
 
 When the owner mentions something that isn't to be built now (an aside, "later", "someday", "maybe"), add it at the
 bottom of `IDEAS.md` as `- I-n — the idea in plain words (YYYY-MM-DD)` and say so in the report. Never put an idea
-in the backlog yourself.
+in the backlog yourself. An idea that fits no repo goes at the bottom of `UNASSIGNED_IDEAS.md` here as `- U-n — the idea
+(YYYY-MM-DD)` instead.
 
 If an item is unclear or blocked, don't guess: leave it in `FEATURE_BACKLOG.md` with a `Blocked:` note saying what's
 missing, and continue with the next one. Don't add, rewrite or reorder backlog items yourself; only remove shipped

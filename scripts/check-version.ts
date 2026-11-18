@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 /** Files whose change doesn't need a new version: the hand-edited projects.json (read live), tests, docs, CI and tooling. */
-const NO_BUMP = [/^(BUILT|FEATURE_BACKLOG|IDEAS|ALL_BUILT|ALL_BACKLOG)\.md$/, /^projects\.json$/, /^README\.md$/,/^tests\//, /^e2e\//, /^scripts\//, /^\.github\//, /^\.claude\//, /^PROJECT\.md$/, /^docs\//, /^CLAUDE\.md$/, /^\.gitignore$/, /^\.gitattributes$/, /^playwright\.config\.ts$/];
+const NO_BUMP = [/^(BUILT|FEATURE_BACKLOG|IDEAS|UNASSIGNED_IDEAS|REPORTS|ALL_BUILT|ALL_BACKLOG)\.md$/, /^projects\.json$/, /^README\.md$/,/^tests\//, /^e2e\//, /^scripts\//, /^\.github\//, /^\.claude\//, /^PROJECT\.md$/, /^docs\//, /^CLAUDE\.md$/, /^\.gitignore$/, /^\.gitattributes$/, /^playwright\.config\.ts$/];
 
 export const changesNeedBump = (files: string[]) => files.some((f) => !NO_BUMP.some((re) => re.test(f)));
 

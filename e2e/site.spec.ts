@@ -108,6 +108,31 @@ test.describe('mocked GitHub', () => {
     await expect(page).toHaveTitle('backlogkit · search “thing”');
   });
 
+  test('Ideas tab: Unassigned first, then repos with ideas; copy and search work (BL-7)', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Ideas', exact: true }).click();
+    await expect(page).toHaveURL(/#\/ideas$/);
+    await expect(page).toHaveTitle('backlogkit · Ideas');
+    const groups = page.locator('[data-testid^="ideas-"]');
+    await expect.poll(() => groups.evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))).toEqual(['ideas-unassigned', 'ideas-demo']);
+    await expect(page.getByTestId('ideas-unassigned')).toContainText('U-1 Orphan gadget for no repo');
+    await expect(page.getByTestId('ideas-demo')).toContainText('Dark mode toggle');
+    await expect(page.getByTestId('ideas-zulu')).toHaveCount(0); // IDEAS.md with no items
+    await expect(page.getByTestId('ideas-alpha')).toHaveCount(0); // no IDEAS.md
+
+    await page.getByTestId('ideas-unassigned').getByRole('button', { name: 'Copy U-1' }).click();
+    expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe('- U-1 — Orphan gadget for no repo (2026-11-18)');
+
+    await page.getByTestId('ideas-demo').getByRole('link', { name: 'demo' }).click();
+    await expect(page).toHaveURL(/#\/p\/demo$/);
+
+    await page.getByRole('searchbox', { name: 'Search' }).fill('U-1');
+    await expect(page.getByTestId('hit')).toHaveCount(1);
+    await expect(page.getByTestId('hit')).toContainText('Unassigned');
+    await expect(page.getByTestId('hit')).toContainText('Orphan gadget');
+  });
+
   test('the token never reaches the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('card-demo')).toBeVisible();

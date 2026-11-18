@@ -14,7 +14,8 @@ export async function fixtureData() {
     files: {
       demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS },
       alpha: { 'FEATURE_BACKLOG.md': '## Ready\n\n### AL-1 — Alpha item\nText.\n' },
-      zulu: { 'FEATURE_BACKLOG.md': '## Ready\n' },
+      zulu: { 'FEATURE_BACKLOG.md': '## Ready\n', 'IDEAS.md': '# Ideas — zulu\n\nNone yet.\n' },
+      backlogkit: { 'UNASSIGNED_IDEAS.md': '# Unassigned ideas\n\n- U-1 — Orphan gadget for no repo (2026-11-18)\n' },
     },
     fails: { broken: 403 },
     projectsJson: projectsJson([

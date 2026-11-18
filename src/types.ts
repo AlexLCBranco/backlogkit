@@ -29,5 +29,7 @@ export interface Data {
   tokenSet: boolean;
   owner: string;
   problems: string[];
+  /** UNASSIGNED_IDEAS.md in this repo (BL-7): file = it exists. */
+  unassigned: { file: boolean; ideas: Idea[] };
   projects: Project[];
 }

@@ -92,3 +92,23 @@ describe('dates for sorting (BL-4)', () => {
     expect(d.problems).toEqual(['Backlog-changed dates not read (they show as a dash): demo (demo commits: HTTP 403 (no access or rate limit))']);
   });
 });
+
+describe('loadAll: UNASSIGNED_IDEAS.md (BL-7)', () => {
+  const text = '# Unassigned ideas\n\nHeader.\n\n- U-1 — A thing for no repo (2026-11-18)\n';
+  it('reads it from this repo\'s main', async () => {
+    const { d, calls } = await load({ repos, files: { ...files, backlogkit: { 'UNASSIGNED_IDEAS.md': text } }, projectsJson: projectsJson(entries) });
+    expect(d.unassigned).toEqual({ file: true, ideas: [{ id: 'U-1', title: 'A thing for no repo (2026-11-18)' }] });
+    expect(calls.some((c) => /backlogkit\/contents\/UNASSIGNED_IDEAS\.md\?ref=main/.test(c.url))).toBe(true);
+  });
+  it('a missing file has no ideas and no problem', async () => {
+    const { d } = await load({ repos, files, projectsJson: projectsJson(entries) });
+    expect(d.unassigned).toEqual({ file: false, ideas: [] });
+    expect(d.problems).toEqual([]);
+  });
+  it('a failed read is a notice, the rest still loads', async () => {
+    const { d } = await load({ repos, files, fails: { backlogkit: 500 }, projectsJson: projectsJson(entries) });
+    expect(d.unassigned).toEqual({ file: false, ideas: [] });
+    expect(d.problems).toEqual(['UNASSIGNED_IDEAS.md not read: backlogkit/UNASSIGNED_IDEAS.md: HTTP 500']);
+    expect(d.projects.find((p) => p.repo === 'demo')!.counts.planned).toBe(3);
+  });
+});

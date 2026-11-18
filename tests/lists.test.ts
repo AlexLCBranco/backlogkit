@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { builtSummary, counts, parseBacklog, parseBuilt, parseBuiltDays, parseIdeas } from '../lib/lists.mjs';
+import { readFileSync } from 'node:fs';
+import { builtSummary, counts, ideaMarkdown, parseBacklog, parseBuilt, parseBuiltDays, parseIdeas, parseUnassignedIdeas } from '../lib/lists.mjs';
 import { BACKLOG, BUILT, IDEAS } from './fixtures';
 
 describe('parseBacklog', () => {
@@ -58,5 +59,26 @@ describe('parseIdeas', () => {
       { id: 'I-1', title: 'Dark mode toggle (2026-11-01)' },
       { id: 'I-2', title: 'Something long that wraps (2026-11-02)' },
     ]);
+  });
+});
+
+describe('parseUnassignedIdeas (BL-7)', () => {
+  it('a missing file has none', () => {
+    expect(parseUnassignedIdeas(null)).toEqual([]);
+    expect(parseUnassignedIdeas(undefined)).toEqual([]);
+  });
+  it('an empty file, or one with only its header, has none', () => {
+    expect(parseUnassignedIdeas('')).toEqual([]);
+    expect(parseUnassignedIdeas(readFileSync('UNASSIGNED_IDEAS.md', 'utf8'))).toEqual([]); // the real file, as created
+  });
+  it('reads U-n items, wrapped lines joined, CRLF too', () => {
+    expect(parseUnassignedIdeas('# Unassigned\r\n\r\nText.\r\n\r\n- U-1 — One (2026-11-18)\r\n- U-2 — Two\r\n  wraps (2026-11-19)\r\n')).toEqual([
+      { id: 'U-1', title: 'One (2026-11-18)' },
+      { id: 'U-2', title: 'Two wraps (2026-11-19)' },
+    ]);
+  });
+  it('ideaMarkdown gives the line back', () => {
+    expect(ideaMarkdown({ id: 'U-1', title: 'One (2026-11-18)' })).toBe('- U-1 — One (2026-11-18)');
+    expect(ideaMarkdown({ id: null, title: 'No id' })).toBe('- No id');
   });
 });

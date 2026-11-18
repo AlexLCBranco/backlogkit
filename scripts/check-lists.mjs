@@ -14,11 +14,12 @@ export function checkLists(dir = '.') {
   const planned = ids(backlog, /^###\s+([A-Z]{2}-\d+[a-z]?)\b/gm)
   const shipped = ids(built, /^-\s+([A-Z]{2}-\d+[a-z]?)\b/gm)
   const ideas = ids(read('IDEAS.md'), /^-\s+(I-\d+)\b/gm)
+  const unassigned = ids(read('UNASSIGNED_IDEAS.md'), /^-\s+(U-\d+)\b/gm)
   const errors = []
   if (backlog && !prefix) errors.push('FEATURE_BACKLOG.md has no "Item IDs are XX-1" line naming this repo\'s prefix')
   for (const id of [...planned, ...shipped])
     if (prefix && !id.startsWith(`${prefix}-`)) errors.push(`${id} does not use this repo's prefix ${prefix}-`)
-  for (const [file, list] of [['FEATURE_BACKLOG.md', planned], ['BUILT.md', shipped], ['IDEAS.md', ideas]])
+  for (const [file, list] of [['FEATURE_BACKLOG.md', planned], ['BUILT.md', shipped], ['IDEAS.md', ideas], ['UNASSIGNED_IDEAS.md', unassigned]])
     for (const id of new Set(list.filter((x, i) => list.indexOf(x) !== i))) errors.push(`${id} appears twice in ${file}`)
   for (const id of planned)
     if (shipped.includes(id)) errors.push(`${id} is in both FEATURE_BACKLOG.md and BUILT.md: cut it from the backlog`)

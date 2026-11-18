@@ -1,15 +1,15 @@
 // The site: Projects (home, one card each), a project's page (Planned | Built, Ideas folded), All repos, and search
-// from the top bar on every page. Routes live in the hash: #/, #/p/<repo>, #/all, plus ?q=<search>.
+// from the top bar on every page. Routes live in the hash: #/, #/p/<repo>, #/all, #/ideas, plus ?q=<search>.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Data, Project, Section, BuiltDay } from './types';
+import type { Data, Idea, Project, Section, BuiltDay } from './types';
 import { search, type Hit } from './search';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
 import { SORT_OPTIONS, loadSort, saveSort, sortProjects, type SortKey } from './sort';
-import { backlogMarkdown, itemMarkdown } from '../lib/lists.mjs';
+import { backlogMarkdown, ideaMarkdown, itemMarkdown } from '../lib/lists.mjs';
 
-export type Route = { page: 'home' } | { page: 'project'; repo: string } | { page: 'all' };
+export type Route = { page: 'home' } | { page: 'project'; repo: string } | { page: 'all' } | { page: 'ideas' };
 
 export function parseHash(hash: string): { route: Route; q: string } {
   const [path = '', query = ''] = hash.replace(/^#/, '').split('?');
@@ -17,6 +17,7 @@ export function parseHash(hash: string): { route: Route; q: string } {
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'p' && parts[1]) return { route: { page: 'project', repo: decodeURIComponent(parts[1]) }, q };
   if (parts[0] === 'all') return { route: { page: 'all' }, q };
+  if (parts[0] === 'ideas') return { route: { page: 'ideas' }, q };
   return { route: { page: 'home' }, q };
 }
 
@@ -25,10 +26,12 @@ export function titleOf(route: Route, q = ''): string {
   if (q.trim()) return `backlogkit · search “${q.trim()}”`;
   if (route.page === 'project') return `backlogkit · ${route.repo} backlog`;
   if (route.page === 'all') return 'backlogkit · All repos';
+  if (route.page === 'ideas') return 'backlogkit · Ideas';
   return 'backlogkit · Projects';
 }
 
-export const hrefOf = (route: Route) => (route.page === 'project' ? `#/p/${encodeURIComponent(route.repo)}` : route.page === 'all' ? '#/all' : '#/');
+export const hrefOf = (route: Route) =>
+  route.page === 'project' ? `#/p/${encodeURIComponent(route.repo)}` : route.page === 'all' ? '#/all' : route.page === 'ideas' ? '#/ideas' : '#/';
 
 /** A field nobody filled in shows as a dash, never a guess. */
 const DASH = '—';
@@ -270,10 +273,51 @@ export function AllRepos({ data }: { data: Data }) {
   );
 }
 
+function IdeaList({ ideas }: { ideas: Idea[] }) {
+  return (
+    <ul className="idea-list">
+      {ideas.map((i, n) => (
+        <li key={`${i.id ?? ''}-${n}`} data-testid="idea">
+          {i.id && <span className="id">{i.id}</span>} {i.title}
+          <CopyButton text={ideaMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const ideasMarkdown = (ideas: Idea[]) => ideas.map(ideaMarkdown).join('\n') + '\n';
+
+/** Every repo's IDEAS.md in one place (BL-7), after the ideas that belong to no repo yet (UNASSIGNED_IDEAS.md). */
+export function IdeasPage({ data }: { data: Data }) {
+  const withIdeas = data.projects.filter((p) => p.ideas.length);
+  const un = data.unassigned;
+  return (
+    <div className="ideas-page">
+      <section className="repo-block" data-testid="ideas-unassigned">
+        <h3>
+          Unassigned <span className="muted">{un.ideas.length}</span>{' '}
+          {un.ideas.length > 0 && <CopyButton text={ideasMarkdown(un.ideas)} label="Copy all Unassigned ideas" />}
+        </h3>
+        {un.ideas.length ? <IdeaList ideas={un.ideas} /> : <p className="muted">{un.file ? 'No unassigned ideas.' : 'No UNASSIGNED_IDEAS.md.'}</p>}
+      </section>
+      {withIdeas.map((p) => (
+        <section key={p.repo} className="repo-block" data-testid={`ideas-${p.repo}`}>
+          <h3>
+            <a href={hrefOf({ page: 'project', repo: p.repo })}>{p.repo}</a> <span className="muted">{p.ideas.length}</span>{' '}
+            <CopyButton text={ideasMarkdown(p.ideas)} label={`Copy all ${p.repo} ideas`} />
+          </h3>
+          <IdeaList ideas={p.ideas} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 const KIND_LABEL: Record<Hit['kind'], string> = { planned: 'Planned', built: 'Built', idea: 'Idea' };
 
 export function SearchResults({ data, q }: { data: Data; q: string }) {
-  const hits = useMemo(() => search(data.projects, q), [data, q]);
+  const hits = useMemo(() => search(data.projects, q, data.unassigned?.ideas), [data, q]);
   return (
     <div className="search-results" data-testid="search-results">
       <h2>
@@ -282,7 +326,11 @@ export function SearchResults({ data, q }: { data: Data; q: string }) {
       {hits.map((h, n) => (
         <details key={n} className="item hit" data-testid="hit">
           <summary>
-            <a href={hrefOf({ page: 'project', repo: h.repo })} className="repo-name">{h.repo}</a>
+            {h.repo === null ? (
+              <a href={hrefOf({ page: 'ideas' })} className="repo-name">Unassigned</a>
+            ) : (
+              <a href={hrefOf({ page: 'project', repo: h.repo })} className="repo-name">{h.repo}</a>
+            )}
             <span className={`badge kind-${h.kind}`}>{KIND_LABEL[h.kind]}</span>
             <span className="muted">{h.where}</span> {h.id && <span className="id">{h.id}</span>} {h.title}
             {h.blocked && <span className="badge blocked">Blocked</span>}
@@ -313,6 +361,7 @@ export function Notices({ data }: { data: Data }) {
 export function View({ data, route, q, go }: { data: Data; route: Route; q: string; go: (r: Route) => void }) {
   if (q.trim()) return <SearchResults data={data} q={q} />;
   if (route.page === 'all') return <AllRepos data={data} />;
+  if (route.page === 'ideas') return <IdeasPage data={data} />;
   if (route.page === 'project') {
     const p = data.projects.find((x) => x.repo.toLowerCase() === route.repo.toLowerCase());
     return p ? <ProjectPage p={p} /> : <p className="warning">No project “{route.repo}”.</p>;
@@ -365,6 +414,7 @@ export function App() {
         </a>
         <a href="#/" className={route.page === 'home' && !q ? 'on' : ''}>Projects</a>
         <a href="#/all" className={route.page === 'all' && !q ? 'on' : ''}>All repos</a>
+        <a href="#/ideas" className={route.page === 'ideas' && !q ? 'on' : ''}>Ideas</a>
         <input type="search" placeholder="Search items by text or ID…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
         {data && <span className="muted stamp" title={`Read from GitHub at ${data.generatedAt}`}>read {new Date(data.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
       </nav>

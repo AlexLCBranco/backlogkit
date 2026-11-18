@@ -84,3 +84,9 @@ h2 button.copy { vertical-align: -3px; }
 /* Sort dropdown above the cards (BL-4). */
 .home .sort { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .home .sort select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
+
+/* Ideas page (BL-7): Unassigned first, then one block per repo with ideas. */
+.ideas-page { max-width: 980px; }
+.ideas-page .repo-block { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px 10px; margin-bottom: 12px; }
+ul.idea-list { margin: 6px 0 0; padding-left: 18px; }
+ul.idea-list li { margin: 3px 0; }

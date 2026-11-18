@@ -4,6 +4,7 @@ import { changesNeedBump } from '../scripts/check-version';
 describe('check-version', () => {
   it("the daily generated ALL_BUILT.md / ALL_BACKLOG.md and the lists don't need a version bump", () => {
     expect(changesNeedBump(['ALL_BUILT.md', 'ALL_BACKLOG.md', 'BUILT.md', 'scripts/all-built.mjs'])).toBe(false);
+    expect(changesNeedBump(['UNASSIGNED_IDEAS.md', 'REPORTS.md'])).toBe(false); // read live / docs
   });
   it('app files do', () => {
     expect(changesNeedBump(['src/App.tsx'])).toBe(true);

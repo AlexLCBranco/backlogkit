@@ -12,6 +12,8 @@ export function parseBacklog(text: string): Section[]
 export function parseBuiltDays(text: string): BuiltDay[]
 export function parseBuilt(text: string): Record<string, string[]>
 export function parseIdeas(text: string): Idea[]
+export function parseUnassignedIdeas(text: string | null | undefined): Idea[]
+export function ideaMarkdown(idea: Idea): string
 export function builtSummary(days: BuiltDay[], text?: string): { latestVersion: string | null; latestBuiltDate: string | null }
 export function counts(sections: Section[], ideas: Idea[]): Counts
 export function itemMarkdown(item: { id: string | null; title: string; heading?: string; body: string }, level?: number): string
