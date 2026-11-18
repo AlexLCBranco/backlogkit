@@ -38,7 +38,7 @@ group and per-repo groups from fixture data, repos without ideas are absent, cop
   the backlog or before building), and says it's a guess.
 - When an item ships, its `BUILT.md` line gets the real numbers: `(took N min, suite M min)`, measured, not guessed, so
   later estimates can be checked against them.
-- Each repo records the duration of its last full local suite run (measured) somewhere backlogkit can read (e.g. a line
+- Suite times vary a lot (the owner has seen very long runs), so estimates are rough ranges. Each repo records the duration of its last full local suite run and its longest one (measured) somewhere backlogkit can read (e.g. a line
   in `BUILT.md`'s header); backlogkit shows it on the project page.
 - backlogkit shows the estimate on each planned card, the actual time on built items, and a total of planned estimates
   per repo and in All repos.
