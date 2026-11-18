@@ -19,7 +19,8 @@ a:hover { text-decoration: underline; }
 .muted { color: var(--muted); }
 
 .topbar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 18px; padding: 10px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.topbar .brand { font-weight: 700; color: var(--text); margin-right: 8px; }
+.topbar .brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--text); margin-right: 8px; }
+.topbar .brand img { display: block; }
 .topbar a.on { color: var(--text); font-weight: 600; }
 .topbar input { flex: 1; max-width: 460px; margin-left: auto; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
 .topbar .stamp { font-size: 12px; }

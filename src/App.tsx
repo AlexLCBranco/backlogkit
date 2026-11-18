@@ -346,7 +346,9 @@ export function App() {
   return (
     <>
       <nav className="topbar">
-        <a className="brand" href="#/" onClick={() => setQ('')}>backlogkit</a>
+        <a className="brand" href="#/" onClick={() => setQ('')}>
+          <img src="/logo.svg" alt="" width="20" height="20" data-testid="logo" /> backlogkit
+        </a>
         <a href="#/" className={route.page === 'home' && !q ? 'on' : ''}>Projects</a>
         <a href="#/all" className={route.page === 'all' && !q ? 'on' : ''}>All repos</a>
         <input type="search" placeholder="Search items by text or ID…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />

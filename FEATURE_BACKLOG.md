@@ -8,10 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-### BL-5 — Real logo
-**What:** an actual backlogkit logo (SVG): in the header and as the favicon. Simple, readable at 16 px, fits the dark look. Keep it in `public/`.
-**Tests:** e2e: favicon and header logo load.
-
 ### BL-6 — Browser tab title follows the page
 **What:** the tab title says what's open ("backlogkit · calendarkit backlog"), like calendarkit and footykit. Owner's rule for all apps.
 **Tests:** e2e: switching project changes the title.

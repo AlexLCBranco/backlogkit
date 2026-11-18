@@ -117,6 +117,20 @@ test('version in the bottom-right corner, and /version.json', async ({ page, req
   await expect(v).toHaveText(`v${json.version}`);
 });
 
+test('logo: header and favicon load (BL-5)', async ({ page, request }) => {
+  await page.route('**/api/projects', async (r) => (live ? r.continue() : r.fulfill({ json: await fixtureData() })));
+  await page.goto('/');
+  const logo = page.getByTestId('logo');
+  await expect(logo).toBeVisible();
+  expect(await logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  const href = await page.locator('link[rel="icon"]').getAttribute('href');
+  expect(href).toBe('/logo.svg');
+  const res = await request.get(href!);
+  expect(res.ok()).toBe(true);
+  expect(res.headers()['content-type']).toContain('image/svg+xml');
+  expect(await res.text()).toContain('<svg');
+});
+
 test('live: real projects load from GitHub', async ({ page }) => {
   test.skip(!live, 'live only');
   await page.goto('/');

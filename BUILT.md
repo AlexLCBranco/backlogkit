@@ -3,6 +3,10 @@
 Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never here.
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-18
+- BL-5 — Real logo (v1.3.0)
+  A backlogkit logo (a ticked list) sits beside the name in the header and is the browser tab's icon.
+
 ## 2026-11-17
 - BL-4 — Sort the project cards (v1.2.0)
   A Sort dropdown above the cards orders each group by backlog changed, last change, created or name (either direction; default backlog changed, newest first), remembered in this browser; each card shows its Backlog changed date.
