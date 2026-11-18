@@ -7,7 +7,55 @@ import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
 import { SORT_OPTIONS, loadSort, saveSort, sortProjects, type SortKey } from './sort';
-import { backlogMarkdown, ideaMarkdown, itemMarkdown } from '../lib/lists.mjs';
+import { backlogMarkdown, estimateTotal, formatDuration, ideaMarkdown, itemMarkdown } from '../lib/lists.mjs';
+import type { Estimate, PlannedItem } from './types';
+
+// Time estimates (BL-8): a guess on planned items, the measured time on built ones, measured suite times per repo.
+const suiteText = (p: Project) => {
+  const s = p.suite;
+  if (!s || (!s.last && !s.longest)) return null;
+  const one = (x: { minutes: number } | null) => (x ? formatDuration({ min: x.minutes, max: x.minutes })!.replace('~', '') : DASH);
+  return `last ${one(s.last)} · longest ${one(s.longest)}`;
+};
+
+function EstimateBadge({ e }: { e: Estimate | null }) {
+  if (!e) return null;
+  if (!e.ok) return <span className="badge estimate bad" data-testid="estimate" title={`Estimate line not readable: ${e.raw}`}>estimate unreadable</span>;
+  return (
+    <span className="badge estimate" data-testid="estimate" title="Estimate (a guess): build = a Claude Code session building it; suite = the repo's full local test suite">
+      build {formatDuration(e.build)} · suite {formatDuration(e.suite)}
+    </span>
+  );
+}
+
+function TookBadge({ t }: { t: Estimate | null }) {
+  if (!t) return null;
+  if (!t.ok) return <span className="badge took bad" data-testid="took" title={`Time not readable: ${t.raw}`}>time unreadable</span>;
+  const n = (d: Estimate['build']) => formatDuration(d)!.replace('~', '');
+  return (
+    <span className="badge took" data-testid="took" title="Measured: build session and full local test suite">
+      took {n(t.build)}{t.suite ? ` · suite ${n(t.suite)}` : ''}
+    </span>
+  );
+}
+
+export function EstimateTotal({ items, label = 'Estimated' }: { items: PlannedItem[]; label?: string }) {
+  if (!items.length) return null;
+  const t = estimateTotal(items);
+  return (
+    <p className="muted estimate-total" data-testid="estimate-total">
+      {label}:{' '}
+      {t.estimated ? (
+        <>
+          build <b>{formatDuration(t.build)}</b> · suite <b>{formatDuration(t.suite)}</b> <span>({t.estimated} of {t.total} items estimated)</span>
+        </>
+      ) : (
+        <>{DASH} <span>(no estimates yet)</span></>
+      )}
+    </p>
+  );
+}
+const plannedItems = (sections: Section[]) => sections.flatMap((s) => s.items);
 
 export type Route = { page: 'home' } | { page: 'project'; repo: string } | { page: 'all' } | { page: 'ideas' };
 
@@ -84,6 +132,10 @@ export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
         <dd>{dash(p.latestVersion && `v${p.latestVersion}`)}</dd>
         <dt>Last built</dt>
         <dd>{dash(p.latestBuiltDate)}</dd>
+        <dt>Suite time</dt>
+        <dd data-testid="suite-time" title={p.suite ? `Measured full local test suite: ${p.suite.raw}` : 'No "Suite time:" line in BUILT.md'}>
+          {dash(suiteText(p))}
+        </dd>
       </dl>
       <p className="counts" data-testid="counts">
         {p.error ? (
@@ -155,6 +207,7 @@ function PlannedList({ sections, empty }: { sections: Section[]; empty: string }
                 {i.id && <span className="id">{i.id}</span>} {i.title}
                 <CopyButton text={itemMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
                 {i.blocked && <span className="badge blocked">Blocked</span>}
+                <EstimateBadge e={i.estimate} />
               </summary>
               <div className="body">{i.body || DASH}</div>
             </details>
@@ -177,6 +230,7 @@ function BuiltList({ days, empty }: { days: BuiltDay[]; empty: string }) {
               <li key={n}>
                 {i.id && <span className="id">{i.id}</span>} {i.title}
                 <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
+                <TookBadge t={i.took} />
                 {i.detail && <div className="muted detail">{i.detail}</div>}
               </li>
             ))}
@@ -196,6 +250,7 @@ export function ProjectPage({ p }: { p: Project }) {
           <h2>
             Planned {backlogMarkdown(p.planned) && <CopyButton text={backlogMarkdown(p.planned)} label="Copy whole backlog" />}
           </h2>
+          <EstimateTotal items={plannedItems(p.planned)} />
           <PlannedList sections={p.planned} empty={p.files.backlog ? 'Nothing planned.' : 'No FEATURE_BACKLOG.md.'} />
         </section>
         <section data-testid="built">
@@ -232,6 +287,7 @@ export function AllRepos({ data }: { data: Data }) {
     <div className="columns all">
       <section data-testid="all-planned">
         <h2>Planned, by repo</h2>
+        <EstimateTotal items={withPlans.flatMap((p) => plannedItems(p.planned))} label="Estimated, all repos" />
         {!withPlans.length && <p className="muted">Nothing planned anywhere.</p>}
         {withPlans.map((p) => (
           <div key={p.repo} className="repo-block">
@@ -239,6 +295,7 @@ export function AllRepos({ data }: { data: Data }) {
               <a href={hrefOf({ page: 'project', repo: p.repo })}>{p.repo}</a>{' '}
               <CopyButton text={backlogMarkdown(p.planned)} label={`Copy whole ${p.repo} backlog`} />
             </h3>
+            <EstimateTotal items={plannedItems(p.planned)} />
             <PlannedList sections={p.planned.filter((s) => s.items.length)} empty="" />
           </div>
         ))}
@@ -260,6 +317,7 @@ export function AllRepos({ data }: { data: Data }) {
                       <li key={n}>
                         {i.id && <span className="id">{i.id}</span>} {i.title}
                         <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
+                <TookBadge t={i.took} />
                         {i.detail && <div className="muted detail">{i.detail}</div>}
                       </li>
                     ))}

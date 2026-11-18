@@ -1,4 +1,4 @@
-import type { BuiltDay, Counts, Idea, Section } from './lists.mjs'
+import type { BuiltDay, Counts, Idea, Section, SuiteRecord } from './lists.mjs'
 
 export const OWNER: string
 export const SELF: string
@@ -23,6 +23,7 @@ export interface LoadedProject {
   ideas: Idea[]
   latestVersion: string | null
   latestBuiltDate: string | null
+  suite: SuiteRecord | null
   counts: Counts
 }
 

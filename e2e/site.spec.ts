@@ -133,6 +133,30 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('hit')).toContainText('Orphan gadget');
   });
 
+  test('time estimates: planned card, built item, suite times, repo and all-repos totals (BL-8)', async ({ page }) => {
+    await page.goto('/#/p/alpha');
+    const planned = page.getByTestId('planned');
+    const items = planned.getByTestId('planned-item');
+    await expect(items.nth(0).getByTestId('estimate')).toHaveText('build ~5 min · suite ~1 min');
+    await expect(items.nth(1).getByTestId('estimate')).toHaveText('estimate unreadable');
+    await expect(planned.getByTestId('estimate-total')).toHaveText('Estimated: build ~5 min · suite ~1 min (1 of 2 items estimated)');
+
+    await page.goto('/#/p/zulu');
+    await expect(page.getByTestId('built').getByTestId('took')).toHaveText('took 25 min · suite 4 min');
+    await expect(page.getByTestId('built')).toContainText('ZU-1 Timed thing (v0.2.0)');
+    await expect(page.getByTestId('built')).not.toContainText('(took');
+
+    await page.goto('/#/p/demo');
+    await expect(page.getByTestId('suite-time')).toHaveText('last 3 min · longest 9 min');
+    await expect(page.getByTestId('planned').getByTestId('estimate-total')).toHaveText('Estimated: — (no estimates yet)');
+    await page.goto('/#/p/alpha');
+    await expect(page.getByTestId('suite-time')).toHaveText('—');
+
+    await page.goto('/#/all');
+    const all = page.getByTestId('all-planned');
+    await expect(all.getByTestId('estimate-total').first()).toHaveText('Estimated, all repos: build ~5 min · suite ~1 min (1 of 5 items estimated)');
+  });
+
   test('the token never reaches the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('card-demo')).toBeVisible();

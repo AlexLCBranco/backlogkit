@@ -1,7 +1,7 @@
 // What /api/projects answers (lib/github.mjs: loadAll).
-import type { BuiltDay, Counts, Idea, Section } from '../lib/lists.mjs';
+import type { BuiltDay, Counts, Idea, Section, SuiteRecord } from '../lib/lists.mjs';
 
-export type { BuiltDay, BuiltItem, Counts, Idea, PlannedItem, Section } from '../lib/lists.mjs';
+export type { BuiltDay, BuiltItem, Counts, Duration, Estimate, Idea, PlannedItem, Section, SuiteRecord } from '../lib/lists.mjs';
 
 export interface Project {
   repo: string;
@@ -21,6 +21,8 @@ export interface Project {
   ideas: Idea[];
   latestVersion: string | null;
   latestBuiltDate: string | null;
+  /** BUILT.md header's measured suite times (BL-8). */
+  suite: SuiteRecord | null;
   counts: Counts;
 }
 

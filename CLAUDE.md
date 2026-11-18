@@ -44,6 +44,16 @@ never reused. Work shipped without a backlog item (a direct request, a fix) gets
 the owner's repos, so they can be merged into one `ALL_BUILT.md`.
 `ALL_BUILT.md` and `ALL_BACKLOG.md` are generated here by `scripts/all-built.mjs` (the `all-built` workflow, daily and on
 demand) from every repo on GitHub plus `projects.json`. Never edit them by hand.
+Time estimates (BL-8; the site shows them):
+- Each planned item carries a line `**Estimate:** build ~N min · suite ~M min` (build = a Claude Code session building
+  it; suite = the repo's full local test suite; ranges like `~10–20 min` are fine, minutes only). When you read an item
+  that has none (listing the backlog or before building), add that line at the bottom of its spec and say in your
+  reply that it's a guess. This is the one edit you make to backlog items yourself.
+- When an item ships, its `BUILT.md` line ends with the real numbers, measured (clock time from starting the item to
+  its commit, and the last full local suite run's duration), never guessed: `- BL-n — title (v<version>) (took N min, suite M min)`.
+- Keep one line in `BUILT.md`'s header (above the first `## ` day), updated after every full local suite run:
+  `Suite time: last ~N min (YYYY-MM-DD) · longest ~M min (YYYY-MM-DD)` (longest = the longest run you measured).
+
 Follow this file's other rules (branches, tests, version bump) as usual.
 
 When the owner mentions something that isn't to be built now (an aside, "later", "someday", "maybe"), add it at the

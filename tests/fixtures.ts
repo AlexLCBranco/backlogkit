@@ -24,6 +24,7 @@ Held text.
 export const BUILT = `# Built — demo
 
 Shipped work only.
+Suite time: last ~3 min (2026-11-15) · longest ~9 min (2026-11-01)
 
 ## 2026-11-15
 - DM-0 — Older thing (v1.1.0)

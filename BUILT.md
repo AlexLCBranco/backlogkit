@@ -2,8 +2,11 @@
 
 Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never here.
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
+Suite time: last ~0.5 min (2026-11-18) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-18
+- BL-8 — Time estimates: build time and local test suite time (v1.6.0) (took 4 min, suite 0.5 min)
+  Planned cards show their estimate (build and suite), built items their measured time, each project card its last and longest suite run, and Planned shows a total per repo and across all repos.
 - BL-7 — Ideas page: every repo's ideas in one place, plus ideas with no repo (v1.5.0)
   A new Ideas tab lists every repo's ideas grouped by repo, each with a copy button, after an Unassigned group read from the new UNASSIGNED_IDEAS.md; search finds those too.
 - BL-6 — Browser tab title follows the page (v1.4.0)
