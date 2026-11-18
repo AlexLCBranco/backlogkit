@@ -7,13 +7,21 @@ Newest day first; "### Internal" housekeeping left out.
 ## 2026-11-17
 
 **backlogkit**
+- BL-4 — Sort the project cards (v1.2.0) A Sort dropdown above the cards orders each group by backlog changed, last change, created or name (either direction; default backlog changed, newest first), remembered in this browser; each card shows its Backlog changed date.
+- BL-3 — Copy buttons: one per feature, one for the whole backlog (v1.1.0) Every planned and built item has a small copy icon beside its title that copies it as Markdown (heading and full text), and Planned has one that copies the whole backlog; the icon turns into a checkmark for a moment.
 - BL-2 — Move the all-repos built list here from gauntlet (v1.0.0) ALL_BUILT.md and the new ALL_BACKLOG.md (every repo's planned items) are now rebuilt here daily from every repo on GitHub; the all-built workflow can also be run by hand from the Actions tab.
 - BL-1 — The site: all projects, their backlogs, built lists and ideas in one place (v1.0.0) One card per project (description, links, status, devices, last push, version, counts), a page per project with Planned and Built side by side and Ideas folded, an All repos view and search across every item.
 
 **calendarkit**
+- A Slate can be drawn from a saved schedule, for the gauntlet's archive files (v1.77.0) Nothing changes in calendarkit itself; the gauntlet's saved boards keep their night's games as they were.
+- Final scores the same night, and the gauntlet's Slate always up to date (v1.76.0) A Slate card shows a game's final score within minutes of the end (from ESPN, with the odds), not the next morning; the gauntlet's whiteboard now loads calendarkit's current Slate itself, so changes here reach it with each deploy.
 - Notes can be typed in the gauntlet's Slate widget: click a note there (v1.75.0) The copy layout, shown live by the gauntlet, opens a clicked note in calendarkit's own field (with ⇄); it looks like the copy until then.
 
 **gauntlet**
+- GT-5 — Slate step 5: live scores and changes reach the widget A Slate shows a game's final score within minutes of the end; a newer schedule, and any new calendarkit Slate design, reach an open whiteboard without a reload (checked every 5 minutes and when you come back to the tab).
+- GT-3 — Today's date in one click The stamps tray (Y) starts with a "Today" item showing the date (e.g. 5/11, São Paulo time); a click drops it where the pointer was, a drag drops it where you let go, as normal text you can edit, that never changes by itself.
+- GT-2 — Resizing a text box scales its font Dragging a text box's corner makes the text bigger or smaller with the box (the style panel shows the new size, e.g. "Font size · 36.5 px"); a side handle still changes only the width and re-wraps; one undo puts the old size back.
+- GT-1 — One broken widget never breaks the page A board, map, Slate or web embed that fails shows a small "This … widget failed" box with Try again, and can still be selected, moved and deleted; the rest of the whiteboard keeps working.
 - GT-4 — Slate step 4: notes on the whiteboard Click a note on a Slate to type in it (Enter adds a line, ⇄ switches PRE/LIVE/POST); clicking away saves it; it is the game's note, the same in /calendar and in backups.
 - GT-9 — Slate hover popups close as soon as the cursor leaves (calendarkit CK-6 on the whiteboard) On the whiteboard a Slate popup closes within 100 ms of leaving, only one is ever open across Slates, and a pan, zoom or press elsewhere closes it at once.
 
