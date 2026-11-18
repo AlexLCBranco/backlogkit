@@ -3,7 +3,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { loadAll } from '../lib/github.mjs';
-import { View, parseHash } from '../src/App';
+import { View, parseHash, titleOf } from '../src/App';
 import { search } from '../src/search';
 import type { Data } from '../src/types';
 import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from './fixtures';
@@ -99,6 +99,15 @@ describe('search', () => {
     expect(hits).toHaveLength(1);
     expect(hits[0]!.textContent).toMatch(/demo.*Planned.*Ready.*DM-2.*Stuck thing.*Blocked/);
     fireEvent.click(hits[0]!.querySelector('summary')!);
+  });
+});
+
+describe('tab title', () => {
+  it('names what is open', () => {
+    expect(titleOf({ page: 'home' })).toBe('backlogkit · Projects');
+    expect(titleOf({ page: 'project', repo: 'calendarkit' })).toBe('backlogkit · calendarkit backlog');
+    expect(titleOf({ page: 'all' })).toBe('backlogkit · All repos');
+    expect(titleOf({ page: 'all' }, '  dark ')).toBe('backlogkit · search “dark”');
   });
 });
 

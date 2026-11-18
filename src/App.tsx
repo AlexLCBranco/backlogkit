@@ -20,6 +20,14 @@ export function parseHash(hash: string): { route: Route; q: string } {
   return { route: { page: 'home' }, q };
 }
 
+/** The browser tab's title for what's open (BL-6): "backlogkit · calendarkit backlog". */
+export function titleOf(route: Route, q = ''): string {
+  if (q.trim()) return `backlogkit · search “${q.trim()}”`;
+  if (route.page === 'project') return `backlogkit · ${route.repo} backlog`;
+  if (route.page === 'all') return 'backlogkit · All repos';
+  return 'backlogkit · Projects';
+}
+
 export const hrefOf = (route: Route) => (route.page === 'project' ? `#/p/${encodeURIComponent(route.repo)}` : route.page === 'all' ? '#/all' : '#/');
 
 /** A field nobody filled in shows as a dash, never a guess. */
@@ -332,6 +340,12 @@ export function App() {
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
+
+  useEffect(() => {
+    // The repo's own spelling once loaded (the hash may be lower case).
+    const repo = route.page === 'project' ? data?.projects.find((p) => p.repo.toLowerCase() === route.repo.toLowerCase())?.repo : undefined;
+    document.title = titleOf(repo ? { page: 'project', repo } : route, q);
+  }, [route, q, data]);
 
   const go = (r: Route) => {
     location.hash = hrefOf(r);

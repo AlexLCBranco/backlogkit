@@ -4,6 +4,8 @@ Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never 
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
 
 ## 2026-11-18
+- BL-6 — Browser tab title follows the page (v1.4.0)
+  The tab title says what's open: "backlogkit · calendarkit backlog" on a project page, "backlogkit · All repos", "backlogkit · Projects", or the search.
 - BL-5 — Real logo (v1.3.0)
   A backlogkit logo (a ticked list) sits beside the name in the header and is the browser tab's icon.
 

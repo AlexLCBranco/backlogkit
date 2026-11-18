@@ -8,10 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-### BL-6 — Browser tab title follows the page
-**What:** the tab title says what's open ("backlogkit · calendarkit backlog"), like calendarkit and footykit. Owner's rule for all apps.
-**Tests:** e2e: switching project changes the title.
-
 ### BL-7 — Ideas page: every repo's ideas in one place, plus ideas with no repo
 **What:** a top-level **Ideas** tab in the header, next to All repos (`#/ideas`).
 - Lists every project's `IDEAS.md` items, grouped by repo (repo name links to the project page), each with its copy

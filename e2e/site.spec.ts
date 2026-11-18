@@ -95,6 +95,19 @@ test.describe('mocked GitHub', () => {
     await expect.poll(names).toEqual(['zulu', 'demo', 'alpha', 'broken']);
   });
 
+  test('the tab title follows the page (BL-6)', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle('backlogkit · Projects');
+    await page.getByTestId('card-demo').click({ position: { x: 200, y: 60 } });
+    await expect(page).toHaveTitle('backlogkit · demo backlog');
+    await page.goto('/#/p/ALPHA'); // the repo's own spelling, whatever the hash says
+    await expect(page).toHaveTitle('backlogkit · alpha backlog');
+    await page.getByRole('link', { name: 'All repos' }).click();
+    await expect(page).toHaveTitle('backlogkit · All repos');
+    await page.getByRole('searchbox', { name: 'Search' }).fill('thing');
+    await expect(page).toHaveTitle('backlogkit · search “thing”');
+  });
+
   test('the token never reaches the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('card-demo')).toBeVisible();
