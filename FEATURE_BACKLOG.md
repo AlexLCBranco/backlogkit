@@ -8,28 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-### BL-17 — Ideas grouped by why they're not planned
-**In short:** Ideas are sorted into groups that say why each one isn't planned yet, and you can set the reason with one click.
-**What:**
-- The shared parser reads a reason tag at the end of an idea (`[why: waiting|decision|too-big|later|never]`, format in
-  CLAUDE.md, "backlogkit formats") into `idea.why` and removes it from the shown text. An unknown value counts as no
-  reason and is listed in `problems`.
-- The Ideas page and the home Ideas lane group ideas by reason, in this order and with these names:
-  **Needs your decision** · **Waiting on something** · **Too big, needs splitting** · **Not important yet** ·
-  **No reason yet** · **Maybe never** (last, folded). Each group shows its count; each idea shows its project label and
-  its text. Unassigned ideas (`UNASSIGNED_IDEAS.md`) are included with an "Unassigned" label.
-- Cleaner text: a parenthesised note at the very end of an idea (e.g. `(PLAN.md "Later list")`, `(same source)`,
-  `(2026-10-16, chat)`) shows small and muted on a line under the idea instead of inline.
-- When the owner is unlocked, each idea has a small reason dropdown (the six groups; "No reason yet" removes the tag).
-  Choosing one makes one commit to that repo's `IDEAS.md` (or `UNASSIGNED_IDEAS.md`) adding or replacing the tag
-  (new action `reason`, same checks as BL-11, commit message `backlogkit: reason <ID> <why>`). **Plan it** stays.
-- Home Ideas lane: one row per non-empty group with its count and its first idea's text; clicking a row opens the Ideas
-  page at that group.
-**Tests:** parser unit (each tag, no tag, unknown tag, tag on a continued indented line, end note split off); grouping
-order and counts; API unit for adding and replacing a tag; e2e with fixtures: group headings in order with counts, the
-dropdown sends the right request.
-**Estimate:** build ~40–60 min · suite ~0.5 min
-
 ### BL-18 — Done: what's new since your last visit
 **In short:** The Done box shows what got built since you last looked, grouped by project, with what you'll see in each app.
 **What:**

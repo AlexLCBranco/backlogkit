@@ -1,6 +1,6 @@
 // BL-11: the text edits behind the one-click moves.
 import { describe, expect, it } from 'vitest';
-import { ALREADY_ANSWERED, answerBlocked, cutIdea, heldToReady, idPrefix, ideaToHeld, nextId } from '../lib/moves.mjs';
+import { REASONS, setWhy, ALREADY_ANSWERED, answerBlocked, cutIdea, heldToReady, idPrefix, ideaToHeld, nextId } from '../lib/moves.mjs';
 import { parseBacklog, parseBlocked, parseIdeas } from '../lib/lists.mjs';
 import { BACKLOG, BUILT, IDEAS } from './fixtures';
 
@@ -96,5 +96,27 @@ describe('answering a Blocked note (BL-16)', () => {
     expect(parseBlocked('- Blocked: plain')).toEqual({ text: 'plain', date: null });
     expect(parseBlocked('nothing')).toBeNull();
     expect(parseBacklog(B('Blocked: q?'))[0]!.items[0]!.blockedNote).toEqual({ text: 'q?', date: null });
+  });
+});
+
+describe('setting an idea reason (BL-17)', () => {
+  const T = '# Ideas\n\n- I-1 — One (2026-11-01)\n- I-2 — Long\n  wraps (2026-11-02) [why: later]\n- I-3 — Three\n'
+  it('adds a tag at the end of the idea (after its continuation line)', () => {
+    expect(setWhy(T, 'I-1', 'decision')).toEqual({ ideas: T.replace('One (2026-11-01)', 'One (2026-11-01) [why: decision]'), changed: true });
+  });
+  it('replaces a tag, also one on a continued line; "none" removes it', () => {
+    expect(setWhy(T, 'I-2', 'never').ideas).toBe(T.replace('[why: later]', '[why: never]'));
+    expect(setWhy(T, 'I-2', 'none').ideas).toBe(T.replace(' [why: later]', ''));
+    expect(setWhy(T, 'I-2', 'later').changed).toBe(false);
+  });
+  it('refuses an unknown reason or idea', () => {
+    expect(REASONS).toEqual(['waiting', 'decision', 'too-big', 'later', 'never', 'none']);
+    expect(() => setWhy(T, 'I-1', 'someday')).toThrow(/not a reason/);
+    expect(() => setWhy(T, 'I-9', 'later')).toThrow(/I-9 is not in the ideas file/);
+  });
+  it('planning a tagged idea leaves the tag behind', () => {
+    const out = ideaToHeld({ ideasText: T, ideaId: 'I-2', backlog: BACKLOG, built: BUILT });
+    expect(out.title).toBe('Long wraps');
+    expect(out.backlog).toContain('### DM-6 — Long wraps\nFrom I-2 (2026-11-02)\n');
   });
 });

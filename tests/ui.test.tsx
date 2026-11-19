@@ -13,7 +13,7 @@ let data: Data;
 beforeAll(async () => {
   const { fetchImpl } = mockGithub({
     repos: [{ name: 'demo' }, { name: 'other' }, { name: 'broken', private: true }, { name: 'bare' }],
-    files: { demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS }, other: { 'FEATURE_BACKLOG.md': '## Ready\n\n### OT-10 — Other ten\n**In short:** Other gets ten.\nmentions DM-1 in passing\n\n## Held\n\n### OT-11 — Other held\nBlocked: needs a key.\n', 'BUILT.md': '## 2026-11-17\n- OT-1 — Other built (v2.0.0)\n', 'IDEAS.md': '# Ideas\n\nNone yet.\n' }, backlogkit: { 'UNASSIGNED_IDEAS.md': '# Unassigned\n\n- U-1 — Orphan gadget (2026-11-18)\n' } },
+    files: { demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS }, other: { 'FEATURE_BACKLOG.md': '## Ready\n\n### OT-10 — Other ten\n**In short:** Other gets ten.\nmentions DM-1 in passing\n\n## Held\n\n### OT-11 — Other held\nBlocked: needs a key.\n', 'BUILT.md': '## 2026-11-17\n- OT-1 — Other built (v2.0.0)\n', 'IDEAS.md': '# Ideas\n\nNone yet.\n' }, backlogkit: { 'UNASSIGNED_IDEAS.md': '# Unassigned\n\n- U-1 — Orphan gadget (2026-11-18) [why: never]\n' } },
     fails: { broken: 403 },
     projectsJson: projectsJson([
       { repo: 'demo', description: 'Demo app', url: 'https://demo.vercel.app', status: 'active', devices: ['desktop'] },
@@ -90,9 +90,11 @@ describe('home page: five lanes (BL-14)', () => {
     expect(lane('stuck').classList.contains('is-empty')).toBe(true);
     expect(lane('waiting').classList.contains('is-empty')).toBe(false);
   });
-  it('Ideas is one row linking to the Ideas page; no idea is in another lane', () => {
+  it('Ideas: one row per non-empty reason group with its count and first idea, linking to that group (BL-17); no idea in another lane', () => {
     show('#/');
-    expect(within(lane('ideas')).getByRole('link', { name: '3 ideas' }).getAttribute('href')).toBe('#/ideas');
+    const rows = within(lane('ideas')).getAllByTestId('ideas-row');
+    expect(rows.map((r) => r.textContent)).toEqual(['No reason yet 2 Dark mode toggle', 'Maybe never 1 Orphan gadget']);
+    expect(rows.map((r) => r.getAttribute('href'))).toEqual(['#/ideas/none', '#/ideas/never']);
     const text = screen.getAllByTestId('board-item').map((i) => i.textContent).join('\n');
     expect(text).not.toMatch(/\b[IU]-\d+/);
   });
@@ -214,7 +216,7 @@ describe('search (BL-14: everything)', () => {
     expect(heads()).toEqual(['Stuck – needs you 0', 'Will be built next 0', 'Waiting for your OK 0', 'Ideas 0', 'Done 1']);
     cleanup();
     show('#/ideas?q=orphan');
-    expect(within(lane('ideas')).getAllByTestId('idea').map((i) => i.textContent)).toEqual(['Unassigned U-1 Orphan gadget (2026-11-18)']);
+    expect(within(lane('ideas')).getAllByTestId('idea').map((i) => i.textContent)).toEqual(['Unassigned U-1 Orphan gadget']);
   });
 });
 
@@ -271,20 +273,30 @@ describe('all built page', () => {
   });
 });
 
-describe('ideas page (BL-7)', () => {
-  it('shows Unassigned first, then each repo with ideas, linked; repos without ideas left out', () => {
+describe('ideas page (BL-7, grouped by reason in BL-17)', () => {
+  const groupHeads = () => screen.getAllByTestId(/^why-/).map((g) => g.querySelector('h3')!.textContent);
+  it('groups every idea by reason, in order, each with its count; Maybe never last and folded', () => {
     show('#/ideas');
-    const blocks = screen.getAllByTestId(/^ideas-/).map((b) => b.dataset.testid);
-    expect(blocks).toEqual(['ideas-unassigned', 'ideas-demo']); // other has an IDEAS.md with no items
-    expect(within(screen.getByTestId('ideas-unassigned')).getAllByTestId('idea').map((i) => i.textContent)).toEqual(['Unassigned U-1 Orphan gadget (2026-11-18)']);
-    const demo = screen.getByTestId('ideas-demo');
-    expect(within(demo).getByRole('link', { name: 'demo' }).getAttribute('href')).toBe('#/p/demo');
-    expect(within(demo).getAllByTestId('idea')).toHaveLength(2);
-    expect(within(demo).getByRole('button', { name: 'Copy I-1' })).toBeTruthy();
+    expect(groupHeads()).toEqual(['Needs your decision 0', 'Waiting on something 0', 'Too big, needs splitting 0', 'Not important yet 0', 'No reason yet 2', 'Maybe never 1']);
+    const never = screen.getByTestId('why-never') as HTMLDetailsElement;
+    expect(never.tagName).toBe('DETAILS');
+    expect(never.open).toBe(false);
+    expect(within(never).getAllByTestId('idea').map((i) => i.querySelector('.idea-main')!.textContent)).toEqual(['Unassigned U-1 Orphan gadget']);
+    const none = screen.getByTestId('why-none');
+    expect(within(none).getAllByTestId('idea').map((i) => i.querySelector('.idea-main')!.textContent)).toEqual(['demo I-1 Dark mode toggle', 'demo I-2 Something long that wraps']);
+    expect(within(none).getByRole('button', { name: 'Copy I-1' })).toBeTruthy();
+    expect(within(screen.getByTestId('why-decision')).getByText('None.')).toBeTruthy();
   });
-  it('an empty Unassigned group says so', () => {
-    render(<View data={{ ...data, unassigned: { file: true, ideas: [] } }} route={{ page: 'ideas' }} q="" go={() => {}} />);
-    expect(screen.getByTestId('ideas-unassigned').textContent).toContain('No unassigned ideas.');
+  it('the end note shows small and muted under the idea, not inline', () => {
+    show('#/ideas');
+    const notes = within(screen.getByTestId('why-none')).getAllByTestId('idea-note');
+    expect(notes.map((n) => [n.textContent, n.className])).toEqual([['2026-11-01', 'muted idea-note'], ['2026-11-02', 'muted idea-note']]);
+  });
+  it('#/ideas/<group> opens that group (Maybe never unfolds)', () => {
+    expect(parseHash('#/ideas/never').route).toEqual({ page: 'ideas', group: 'never' });
+    expect(parseHash('#/ideas/bogus').route).toEqual({ page: 'ideas' });
+    show('#/ideas/never');
+    expect((screen.getByTestId('why-never') as HTMLDetailsElement).open).toBe(true);
   });
 });
 
@@ -349,12 +361,12 @@ describe('one-click moves (BL-11)', () => {
   it('Ideas page: "Plan it" on repo ideas; an unassigned idea needs a repo picked first', async () => {
     const { o, moves } = owner();
     showAs(o, '#/ideas');
-    const demoIdeas = within(screen.getByTestId('ideas-demo')).getAllByTestId('move');
+    const demoIdeas = within(screen.getByTestId('why-none')).getAllByTestId('move');
     expect(demoIdeas.map((b) => b.textContent)).toEqual(['Plan it', 'Plan it']);
     fireEvent.click(demoIdeas[1]!);
     await waitFor(() => expect(moves).toEqual([{ action: 'idea', repo: 'demo', id: 'I-2' }]));
 
-    const un = screen.getByTestId('ideas-unassigned');
+    const un = screen.getByTestId('why-never');
     const btn = within(un).getByTestId('move') as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     const pick = within(un).getByTestId('move-to') as HTMLSelectElement;
@@ -362,6 +374,23 @@ describe('one-click moves (BL-11)', () => {
     fireEvent.change(pick, { target: { value: 'other' } });
     fireEvent.click(btn);
     await waitFor(() => expect(moves[1]).toEqual({ action: 'idea', repo: 'other', id: 'U-1', from: 'unassigned' }));
+  });
+
+  it('Ideas page: the reason dropdown (owner only) sends the right request (BL-17)', async () => {
+    showAs(owner({ unlocked: false }).o, '#/ideas');
+    expect(screen.queryAllByTestId('reason')).toEqual([]);
+    cleanup();
+    const { o, moves } = owner();
+    showAs(o, '#/ideas');
+    const pick = screen.getByLabelText('Reason for I-2') as HTMLSelectElement;
+    expect(pick.value).toBe('none');
+    expect([...pick.options].map((x) => x.textContent)).toEqual(['Needs your decision', 'Waiting on something', 'Too big, needs splitting', 'Not important yet', 'No reason yet', 'Maybe never']);
+    fireEvent.change(pick, { target: { value: 'too-big' } });
+    await waitFor(() => expect(moves).toEqual([{ action: 'reason', repo: 'demo', id: 'I-2', why: 'too-big' }]));
+    const un = screen.getByLabelText('Reason for U-1') as HTMLSelectElement;
+    expect(un.value).toBe('never');
+    fireEvent.change(un, { target: { value: 'none' } });
+    await waitFor(() => expect(moves[1]).toEqual({ action: 'reason', repo: '', id: 'U-1', why: 'none', from: 'unassigned' }));
   });
 
   it("shows the server's reason next to the button when a move fails", async () => {

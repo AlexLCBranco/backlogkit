@@ -7,3 +7,5 @@ export function cutIdea(ideasText: string | null, ideaId: string): { ideas: stri
 export function heldToReady(a: { backlog: string | null; id: string }): { backlog: string; title: string }
 export const ALREADY_ANSWERED: string
 export function answerBlocked(a: { backlog: string | null; id: string; answer: string; date: string }): { backlog: string; question: string }
+export const REASONS: string[]
+export function setWhy(ideasText: string | null, ideaId: string, why: string): { ideas: string; changed: boolean }

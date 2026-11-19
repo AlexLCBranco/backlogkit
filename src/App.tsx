@@ -23,8 +23,14 @@ import {
   matches,
   projectLaneCounts,
   saveFilter,
+  WHY_GROUPS,
+  ideaGroups,
+  isWhyKey,
+  planTargets,
+  type BoardIdea,
   type BoardItem,
   type Lane,
+  type WhyKey,
 } from './board';
 
 /** A field nobody filled in shows as a dash, never a guess. */
@@ -77,7 +83,7 @@ export function EstimateTotal({ items, label = 'Estimated' }: { items: { estimat
   );
 }
 
-export type Route = { page: 'board'; only?: string } | { page: 'projects' } | { page: 'ideas' } | { page: 'built' };
+export type Route = { page: 'board'; only?: string } | { page: 'projects' } | { page: 'ideas'; group?: WhyKey } | { page: 'built' };
 
 export function parseHash(hash: string): { route: Route; q: string } {
   const [path = '', query = ''] = hash.replace(/^#/, '').split('?');
@@ -85,7 +91,7 @@ export function parseHash(hash: string): { route: Route; q: string } {
   const parts = path.split('/').filter(Boolean);
   if (parts[0] === 'p' && parts[1]) return { route: { page: 'board', only: decodeURIComponent(parts[1]) }, q }; // old project page
   if (parts[0] === 'projects') return { route: { page: 'projects' }, q };
-  if (parts[0] === 'ideas') return { route: { page: 'ideas' }, q };
+  if (parts[0] === 'ideas') return { route: isWhyKey(parts[1]) ? { page: 'ideas', group: parts[1] } : { page: 'ideas' }, q };
   if (parts[0] === 'built') return { route: { page: 'built' }, q };
   return { route: { page: 'board' }, q }; // also the old #/all
 }
@@ -100,7 +106,13 @@ export function titleOf(route: Route, q = ''): string {
 }
 
 export const hrefOf = (route: Route) =>
-  route.page === 'board' ? (route.only ? `#/p/${encodeURIComponent(route.only)}` : '#/') : `#/${route.page}`;
+  route.page === 'board'
+    ? route.only
+      ? `#/p/${encodeURIComponent(route.only)}`
+      : '#/'
+    : route.page === 'ideas' && route.group
+      ? `#/ideas/${route.group}`
+      : `#/${route.page}`;
 
 const STATUS_GROUPS: { key: string; label: string; test: (p: Project) => boolean }[] = [
   { key: 'active', label: 'Active', test: (p) => !p.noFiles && p.status === 'active' },
@@ -412,16 +424,18 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
             <ul className="idea-list">
               {visibleIdeas.map((i) => (
                 <li key={i.key} data-testid="idea">
-                  <ProjectLabel repo={i.repo} /> {i.idea.id && <span className="id">{i.idea.id}</span>} {i.idea.title}
+                  <ProjectLabel repo={i.repo} /> {i.idea.id && <span className="id">{i.idea.id}</span>} {i.idea.text}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="ideas-row" data-testid="ideas-row">
-              <a href={hrefOf({ page: 'ideas' })}>
-                {counts.ideas} {counts.ideas === 1 ? 'idea' : 'ideas'}
-              </a>
-            </p>
+            ideaGroups(visibleIdeas)
+              .filter((g) => g.ideas.length)
+              .map((g) => (
+                <a key={g.key} className="ideas-group-row" data-testid="ideas-row" href={hrefOf({ page: 'ideas', group: g.key })}>
+                  <span className="group-name">{g.label}</span> <b>{g.ideas.length}</b> <span className="muted first-idea">{g.ideas[0]!.idea.text}</span>
+                </a>
+              ))
           )}
         </Lane>
         <Lane k="done" count={counts.done}>
@@ -501,47 +515,97 @@ function UnassignedMove({ idea, targets }: { idea: Idea; targets: string[] }) {
   );
 }
 
-/** repo: whose IDEAS.md this is (with a FEATURE_BACKLOG.md to move into), or 'unassigned' with the repos to pick from. */
-function IdeaList({ ideas, label, repo, targets = [] }: { ideas: Idea[]; label: string | null; repo?: string | 'unassigned'; targets?: string[] }) {
+/** The owner's reason dropdown (BL-17): one commit setting the idea's [why: …] tag; "No reason yet" removes it. */
+function ReasonSelect({ bi }: { bi: BoardIdea }) {
+  const o = useOwner();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const id = bi.idea.id;
+  if (!o.unlocked || !id) return null;
   return (
-    <ul className="idea-list">
-      {ideas.map((i, n) => (
-        <li key={`${i.id ?? ''}-${n}`} data-testid="idea">
-          <ProjectLabel repo={label} /> {i.id && <span className="id">{i.id}</span>} {i.title}
-          <CopyButton text={ideaMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
-          {i.id && repo === 'unassigned' && <UnassignedMove idea={i} targets={targets} />}
-          {i.id && repo && repo !== 'unassigned' && <MoveButton label="Plan it" title={`Plan ${i.id}: it moves to “Waiting for your OK” in ${repo}`} req={{ action: 'idea', repo, id: i.id }} />}
-        </li>
-      ))}
-    </ul>
+    <>
+      <select
+        className="reason"
+        aria-label={`Reason for ${id}`}
+        data-testid="reason"
+        value={bi.idea.why ?? 'none'}
+        disabled={busy}
+        onChange={async (e) => {
+          const why = e.target.value;
+          setBusy(true);
+          setErr(null);
+          const error = await o.move(bi.repo === null ? { action: 'reason', repo: '', id, why, from: 'unassigned' } : { action: 'reason', repo: bi.repo, id, why });
+          setBusy(false);
+          setErr(error);
+        }}
+      >
+        {WHY_GROUPS.map((g) => (
+          <option key={g.key} value={g.key}>{g.label}</option>
+        ))}
+      </select>
+      {err && <span className="error move-error" role="alert" data-testid="move-error">{err}</span>}
+    </>
   );
 }
 
-const ideasMarkdown = (ideas: Idea[]) => ideas.map(ideaMarkdown).join('\n') + '\n';
+function IdeaRow({ bi, targets }: { bi: BoardIdea; targets: string[] }) {
+  const i = bi.idea;
+  return (
+    <li data-testid="idea" data-repo={bi.repo ?? 'unassigned'}>
+      <div className="idea-main">
+        <ProjectLabel repo={bi.repo} /> {i.id && <span className="id">{i.id}</span>} <span className="idea-text">{i.text}</span>
+        <CopyButton text={ideaMarkdown(i)} label={`Copy ${i.id ?? i.text}`} />
+        {i.id && bi.repo === null && <UnassignedMove idea={i} targets={targets} />}
+        {i.id && bi.repo !== null && targets.includes(bi.repo) && (
+          <MoveButton label="Plan it" title={`Plan ${i.id}: it moves to “Waiting for your OK” in ${bi.repo}`} req={{ action: 'idea', repo: bi.repo, id: i.id }} />
+        )}
+        <ReasonSelect bi={bi} />
+      </div>
+      {i.note && <div className="muted idea-note" data-testid="idea-note">{i.note}</div>}
+    </li>
+  );
+}
 
-/** Every repo's IDEAS.md in one place (BL-7), after the ideas that belong to no repo yet (UNASSIGNED_IDEAS.md). */
-export function IdeasPage({ data }: { data: Data }) {
-  const withIdeas = data.projects.filter((p) => p.ideas.length);
-  const un = data.unassigned;
-  const targets = data.projects.filter((p) => p.files.backlog).map((p) => p.repo).sort((a, b) => a.localeCompare(b));
+/**
+ * Every idea in one place (BL-7), grouped by why it isn't planned (BL-17): Needs your decision, Waiting on something,
+ * Too big, Not important yet, No reason yet, Maybe never (folded). Unassigned ideas are in it with their own label.
+ * `group` (from #/ideas/<group>) scrolls to that group and opens it.
+ */
+export function IdeasPage({ data, group }: { data: Data; group?: WhyKey }) {
+  const groups = ideaGroups(boardIdeas(data, loadSort()));
+  const targets = planTargets(data);
+  useEffect(() => {
+    if (group) document.getElementById(`why-${group}`)?.scrollIntoView?.({ block: 'start' });
+  }, [group]);
   return (
     <div className="ideas-page">
-      <section className="repo-block" data-testid="ideas-unassigned">
-        <h3>
-          Unassigned <span className="muted">{un.ideas.length}</span>{' '}
-          {un.ideas.length > 0 && <CopyButton text={ideasMarkdown(un.ideas)} label="Copy all Unassigned ideas" />}
-        </h3>
-        {un.ideas.length ? <IdeaList ideas={un.ideas} label={null} repo="unassigned" targets={targets} /> : <p className="muted">{un.file ? 'No unassigned ideas.' : 'No UNASSIGNED_IDEAS.md.'}</p>}
-      </section>
-      {withIdeas.map((p) => (
-        <section key={p.repo} className="repo-block" data-testid={`ideas-${p.repo}`}>
+      {groups.map((g) => {
+        const head = (
           <h3>
-            <a href={hrefOf({ page: 'board', only: p.repo })}>{p.repo}</a> <span className="muted">{p.ideas.length}</span>{' '}
-            <CopyButton text={ideasMarkdown(p.ideas)} label={`Copy all ${p.repo} ideas`} />
+            {g.label} <span className="muted count">{g.ideas.length}</span>
           </h3>
-          <IdeaList ideas={p.ideas} label={p.repo} repo={p.files.backlog ? p.repo : undefined} />
-        </section>
-      ))}
+        );
+        const list = g.ideas.length ? (
+          <ul className="idea-list">
+            {g.ideas.map((bi) => (
+              <IdeaRow key={bi.key} bi={bi} targets={targets} />
+            ))}
+          </ul>
+        ) : (
+          <p className="muted empty">None.</p>
+        );
+        return g.folded ? (
+          <details key={g.key} id={`why-${g.key}`} className="why-group" data-testid={`why-${g.key}`} open={group === g.key}>
+            <summary>{head}</summary>
+            {list}
+          </details>
+        ) : (
+          <section key={g.key} id={`why-${g.key}`} className="why-group" data-testid={`why-${g.key}`}>
+            {head}
+            {list}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -565,7 +629,7 @@ export function Notices({ data }: { data: Data }) {
 export function View({ data, route, q, go, now }: { data: Data; route: Route; q: string; go: (r: Route) => void; now?: Date }) {
   if (!q.trim()) {
     if (route.page === 'projects') return <ProjectsPage data={data} go={go} />;
-    if (route.page === 'ideas') return <IdeasPage data={data} />;
+    if (route.page === 'ideas') return <IdeasPage data={data} group={route.group} />;
     if (route.page === 'built') return <BuiltPage data={data} />;
   }
   return <Home data={data} q={q} only={route.page === 'board' ? route.only : undefined} now={now} />;

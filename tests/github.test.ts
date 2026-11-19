@@ -97,8 +97,12 @@ describe('loadAll: UNASSIGNED_IDEAS.md (BL-7)', () => {
   const text = '# Unassigned ideas\n\nHeader.\n\n- U-1 — A thing for no repo (2026-11-18)\n';
   it('reads it from this repo\'s main', async () => {
     const { d, calls } = await load({ repos, files: { ...files, backlogkit: { 'UNASSIGNED_IDEAS.md': text } }, projectsJson: projectsJson(entries) });
-    expect(d.unassigned).toEqual({ file: true, ideas: [{ id: 'U-1', title: 'A thing for no repo (2026-11-18)' }] });
+    expect(d.unassigned).toMatchObject({ file: true, ideas: [{ id: 'U-1', title: 'A thing for no repo (2026-11-18)', text: 'A thing for no repo' }] });
     expect(calls.some((c) => /backlogkit\/contents\/UNASSIGNED_IDEAS\.md\?ref=main/.test(c.url))).toBe(true);
+  });
+  it('an unknown reason tag is listed in problems (BL-17)', async () => {
+    const { d } = await load({ repos, files: { ...files, backlogkit: { 'UNASSIGNED_IDEAS.md': '- U-1 — A [why: someday]\n- U-2 — B [why: later]\n' } }, projectsJson: projectsJson(entries) });
+    expect(d.problems).toEqual(['Unknown idea reason tags (shown under "No reason yet"): UNASSIGNED_IDEAS.md U-1: [why: someday]']);
   });
   it('a missing file has no ideas and no problem', async () => {
     const { d } = await load({ repos, files, projectsJson: projectsJson(entries) });

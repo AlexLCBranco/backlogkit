@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { builtSummary, counts, ideaMarkdown, parseBacklog, parseBuilt, parseBuiltDays, parseIdeas, parseShort, parseUnassignedIdeas } from '../lib/lists.mjs';
+import { WHY, builtSummary, counts, ideaMarkdown, splitIdea, parseBacklog, parseBuilt, parseBuiltDays, parseIdeas, parseShort, parseUnassignedIdeas } from '../lib/lists.mjs';
 import { BACKLOG, BUILT, IDEAS } from './fixtures';
 
 describe('parseBacklog', () => {
@@ -56,9 +56,30 @@ describe('parseBuiltDays', () => {
 describe('parseIdeas', () => {
   it('reads I-n ideas, joining wrapped lines', () => {
     expect(parseIdeas(IDEAS)).toEqual([
-      { id: 'I-1', title: 'Dark mode toggle (2026-11-01)' },
-      { id: 'I-2', title: 'Something long that wraps (2026-11-02)' },
+      { id: 'I-1', title: 'Dark mode toggle (2026-11-01)', text: 'Dark mode toggle', note: '2026-11-01', why: null, badWhy: null },
+      { id: 'I-2', title: 'Something long that wraps (2026-11-02)', text: 'Something long that wraps', note: '2026-11-02', why: null, badWhy: null },
     ]);
+  });
+});
+
+describe('idea reasons and end notes (BL-17)', () => {
+  it('reads each tag, takes it off the shown text, keeps the full line in title', () => {
+    for (const why of WHY) expect(parseIdeas(`- I-1 — Thing (2026-11-01) [why: ${why}]\n`)[0]).toMatchObject({ text: 'Thing', note: '2026-11-01', why, badWhy: null, title: `Thing (2026-11-01) [why: ${why}]` });
+  });
+  it('no tag → why null; an unknown tag → why null and badWhy set', () => {
+    expect(parseIdeas('- I-1 — Thing\n')[0]).toMatchObject({ text: 'Thing', note: null, why: null, badWhy: null });
+    expect(parseIdeas('- I-1 — Thing [why: someday]\n')[0]).toMatchObject({ text: 'Thing', why: null, badWhy: 'someday' });
+  });
+  it('a tag on a continued indented line', () => {
+    expect(parseIdeas('- I-2 — Something long\n  that wraps (2026-11-02) [why: Too-Big]\n- I-3 — Next\n')).toMatchObject([
+      { id: 'I-2', text: 'Something long that wraps', note: '2026-11-02', why: 'too-big' },
+      { id: 'I-3', text: 'Next', why: null },
+    ]);
+  });
+  it('the parenthesised note at the very end splits off; one in the middle stays', () => {
+    expect(splitIdea('Use the (new) API (PLAN.md "Later list")')).toEqual({ text: 'Use the (new) API', note: 'PLAN.md "Later list"', why: null, badWhy: null });
+    expect(splitIdea('Thing (2026-10-16, chat) [why: later]')).toEqual({ text: 'Thing', note: '2026-10-16, chat', why: 'later', badWhy: null });
+    expect(splitIdea('(only a note)')).toEqual({ text: '(only a note)', note: null, why: null, badWhy: null });
   });
 });
 
@@ -72,7 +93,7 @@ describe('parseUnassignedIdeas (BL-7)', () => {
     expect(parseUnassignedIdeas(readFileSync('UNASSIGNED_IDEAS.md', 'utf8'))).toEqual([]); // the real file, as created
   });
   it('reads U-n items, wrapped lines joined, CRLF too', () => {
-    expect(parseUnassignedIdeas('# Unassigned\r\n\r\nText.\r\n\r\n- U-1 — One (2026-11-18)\r\n- U-2 — Two\r\n  wraps (2026-11-19)\r\n')).toEqual([
+    expect(parseUnassignedIdeas('# Unassigned\r\n\r\nText.\r\n\r\n- U-1 — One (2026-11-18)\r\n- U-2 — Two\r\n  wraps (2026-11-19)\r\n')).toMatchObject([
       { id: 'U-1', title: 'One (2026-11-18)' },
       { id: 'U-2', title: 'Two wraps (2026-11-19)' },
     ]);

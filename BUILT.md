@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-19
+- BL-17 — Ideas grouped by why they're not planned (v1.13.0) (took 4 min, suite 0.4 min)
+  The Ideas page and the home Ideas box group ideas into Needs your decision, Waiting on something, Too big, Not important yet, No reason yet and Maybe never (folded); dates and notes sit small under each idea, and after unlocking each idea has a reason dropdown.
 - BL-16 — Stuck items: show the question and answer it from the site (v1.12.0) (took 4 min, suite 0.4 min)
   Each stuck item shows its question in red (with its date); after unlocking as owner, Answer opens a box and Save writes the answer into that repo's backlog, so the item leaves Stuck.
 - BL-15 — Cards anyone can read: plain sentence first, project name instead of a dot (v1.11.0) (took 3 min, suite 0.4 min)

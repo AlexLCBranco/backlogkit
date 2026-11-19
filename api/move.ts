@@ -3,6 +3,8 @@
 //   { action: "idea", repo, id: "I-n" }                   → IDEAS.md idea → bottom of that repo's "## Held"
 //   { action: "idea", repo, id: "U-n", from: "unassigned" } → UNASSIGNED_IDEAS.md (here) → bottom of repo's "## Held"
 //   { action: "ready", repo, id: "XX-n" }                 → "## Held" item → bottom of "## Ready"
+//   { action: "reason", repo, id: "I-n", why }            → the idea's [why: …] tag set or removed ("none") (BL-17)
+//   { action: "reason", id: "U-n", why, from: "unassigned" } → the same in UNASSIGNED_IDEAS.md here
 //   { action: "answer", repo, id: "XX-n", answer }        → its Blocked note → "**Answered (date):** … → answer" (BL-16)
 // Only the owner: every request needs the header x-owner-password matching the Vercel env var OWNER_PASSWORD. Writes
 // use GITHUB_WRITE_TOKEN (fine-grained, Contents: read and write on the owner's repos); the read-only GITHUB_TOKEN of
@@ -11,7 +13,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { FILES, SELF, UNASSIGNED } from '../lib/github.mjs';
 import { makeWriter, type Head } from '../lib/github-write.mjs';
-import { ID_RE, MoveError, answerBlocked, cutIdea, heldToReady, ideaToHeld } from '../lib/moves.mjs';
+import { ID_RE, MoveError, answerBlocked, cutIdea, heldToReady, ideaToHeld, setWhy } from '../lib/moves.mjs';
 import { counts, parseBacklog, parseIdeas } from '../lib/lists.mjs';
 import { movesEnabled } from '../lib/moves-env.mjs';
 
@@ -30,7 +32,7 @@ export function passwordOk(given: string | null): boolean {
 
 const reply = (status: number, body: object) => Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 
-export interface MoveRequest { action: 'check' | 'idea' | 'ready' | 'answer'; repo?: string; id?: string; from?: 'unassigned'; answer?: string }
+export interface MoveRequest { action: 'check' | 'idea' | 'ready' | 'answer' | 'reason'; repo?: string; id?: string; from?: 'unassigned'; answer?: string; why?: string }
 export const MAX_ANSWER = 2000;
 export interface RepoUpdate { repo: string; planned?: ReturnType<typeof parseBacklog>; ideas?: ReturnType<typeof parseIdeas>; counts?: ReturnType<typeof counts> }
 export interface MoveAnswer { ok: true; message: string; newId?: string; updates: RepoUpdate[]; unassigned?: ReturnType<typeof parseIdeas> }
@@ -48,8 +50,9 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export async function move(req: MoveRequest, { token, fetchImpl = fetch, now = () => new Date() }: { token: string; fetchImpl?: typeof fetch; now?: () => Date }): Promise<MoveAnswer> {
-  const { action, repo, id, from } = req;
-  if (action !== 'idea' && action !== 'ready' && action !== 'answer') throw new MoveError('Unknown action');
+  const { action, id, from } = req;
+  if (action !== 'idea' && action !== 'ready' && action !== 'answer' && action !== 'reason') throw new MoveError('Unknown action');
+  const repo = action === 'reason' && from === 'unassigned' ? SELF : req.repo;
   if (!repo || !REPO_RE.test(repo)) throw new MoveError('No valid repo given');
   if (!id || !ID_RE.test(id)) throw new MoveError('No valid ID given');
   const gh = makeWriter({ token, fetchImpl });
@@ -58,6 +61,24 @@ export async function move(req: MoveRequest, { token, fetchImpl = fetch, now = (
     const list = parseIdeas(ideas ?? '');
     return { repo: r, planned, ideas: list, counts: counts(planned, list) };
   };
+
+  if (action === 'reason') {
+    const why = String(req.why ?? '');
+    const unassigned = from === 'unassigned';
+    if (unassigned !== id.startsWith('U-')) throw new MoveError(unassigned ? 'Unassigned ideas have U IDs' : 'Repo ideas have I IDs');
+    const path = unassigned ? UNASSIGNED : FILES.ideas;
+    return withRetry(async () => {
+      const head = await gh.head(repo);
+      const text = await gh.file(repo, path, head.sha);
+      if (text === null) throw new MoveError(`${repo} has no ${path}`);
+      const out = setWhy(text, id, why);
+      if (out.changed) await gh.commit(repo, head, { [path]: out.ideas }, `backlogkit: reason ${id} ${why}`);
+      const list = parseIdeas(out.ideas);
+      const answer: MoveAnswer = { ok: true, message: `${id}: reason ${why}`, updates: unassigned ? [] : [{ repo, ideas: list }] };
+      if (unassigned) answer.unassigned = list;
+      return answer;
+    });
+  }
 
   if (action === 'answer') {
     const answer = typeof req.answer === 'string' ? req.answer : '';

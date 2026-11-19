@@ -199,6 +199,23 @@ describe('/api/move (BL-11)', () => {
     expect(gh.log('demo')).toEqual(['init']);
   });
 
+  it('reason: one commit setting the tag, message "backlogkit: reason <ID> <why>"; unassigned ideas here (BL-17)', async () => {
+    const gh = fakeGithub({ demo: demo(), backlogkit: { 'UNASSIGNED_IDEAS.md': '# U\n\n- U-1 — Orphan (2026-11-18) [why: later]\n' } });
+    vi.stubGlobal('fetch', gh.fetchImpl);
+    const { POST } = await import('../api/move');
+    const a = await (await POST(post({ action: 'reason', repo: 'demo', id: 'I-1', why: 'decision' }))).json();
+    expect(gh.file('demo', 'IDEAS.md')).toBe(IDEAS.replace('Dark mode toggle (2026-11-01)', 'Dark mode toggle (2026-11-01) [why: decision]'));
+    expect(gh.log('demo')).toEqual(['backlogkit: reason I-1 decision', 'init']);
+    expect(a.updates[0].ideas[0]).toMatchObject({ id: 'I-1', why: 'decision', text: 'Dark mode toggle' });
+    const b = await (await POST(post({ action: 'reason', id: 'U-1', why: 'none', from: 'unassigned' }))).json();
+    expect(gh.file('backlogkit', 'UNASSIGNED_IDEAS.md')).toBe('# U\n\n- U-1 — Orphan (2026-11-18)\n');
+    expect(gh.log('backlogkit')).toEqual(['backlogkit: reason U-1 none', 'init']);
+    expect(b.unassigned[0]).toMatchObject({ id: 'U-1', why: null });
+    expect((await POST(post({ action: 'reason', repo: 'demo', id: 'I-1', why: 'someday' }))).status).toBe(409);
+    expect((await POST(post({ action: 'reason', repo: 'demo', id: 'I-1', why: 'decision' }))).status).toBe(200); // already set: no new commit
+    expect(gh.log('demo')).toHaveLength(2);
+  });
+
   it('/api/projects says whether moves are on', async () => {
     const { mockGithub, projectsJson } = await import('./fixtures');
     vi.stubGlobal('fetch', mockGithub({ repos: [], files: {}, projectsJson: projectsJson([]) }).fetchImpl);

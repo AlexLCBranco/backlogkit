@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fixtureData } from './fixture-data';
 import { BACKLOG, BUILT, IDEAS } from '../tests/fixtures';
-import { answerBlocked, heldToReady, ideaToHeld } from '../lib/moves.mjs';
+import { answerBlocked, heldToReady, ideaToHeld, setWhy } from '../lib/moves.mjs';
 import { counts, parseBacklog, parseIdeas } from '../lib/lists.mjs';
 
 const live = !!process.env.LIVE_URL;
@@ -54,7 +54,7 @@ test.describe('mocked GitHub', () => {
     expect(await lines(page, 'stuck')).toEqual(['demo | Stuck thing* | DM-2']);
     expect(await lines(page, 'next')).toEqual(['alpha | Alpha gets a plain sentence. | AL-1', 'alpha | Odd estimate* | AL-2', 'demo | First thing* | DM-1', `zulu | ${LONG}* | ZU-2`]);
     expect(await lines(page, 'waiting')).toEqual(['demo | Later thing* | DM-3']);
-    await expect(page.getByTestId('lane-ideas').getByRole('link', { name: '3 ideas' })).toHaveAttribute('href', '#/ideas');
+    await expect(page.getByTestId('lane-ideas').getByTestId('ideas-row')).toHaveText(['Needs your decision 1 Orphan gadget for no repo', 'No reason yet 2 Dark mode toggle']);
     expect(await lines(page, 'done')).toEqual(['demo | Newest thing (v1.3.0) | DM-5', 'demo | A fix without ID (v1.2.1)', 'demo | v1.2.0: old style line', 'demo | Older thing (v1.1.0) | DM-0']); // zulu's 11-12 is older than 7 days
 
     // Stuck is red-tinted; its number red above 0.
@@ -202,7 +202,7 @@ test.describe('mocked GitHub', () => {
     await expect.poll(() => heads(page)).toEqual(['Stuck – needs you 1', 'Will be built next 1', 'Waiting for your OK 1', 'Ideas 1', 'Done 3']); // "Something long" is an idea; ZU-1 is older than 7 days
     await page.goto('/#/ideas');
     await box.fill('orphan'); // an idea
-    await expect(page.getByTestId('lane-ideas').getByTestId('idea')).toHaveText(['Unassigned U-1 Orphan gadget for no repo (2026-11-18)']);
+    await expect(page.getByTestId('lane-ideas').getByTestId('idea')).toHaveText(['Unassigned U-1 Orphan gadget for no repo']);
     await box.fill('');
     await expect.poll(() => heads(page)).toEqual(ALL_HEADS);
   });
@@ -279,24 +279,48 @@ test.describe('mocked GitHub', () => {
     await expect(page).toHaveTitle('backlogkit · search “thing”');
   });
 
-  test('Ideas tab: Unassigned first, then repos with ideas; copy works (BL-7)', async ({ page, context }) => {
+  test('Ideas page: grouped by reason in order with counts, notes under the idea, copy keeps the whole line (BL-7, BL-17)', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/');
     await page.getByRole('link', { name: 'Ideas', exact: true }).click();
     await expect(page).toHaveURL(/#\/ideas$/);
-    const groups = page.locator('[data-testid^="ideas-"]');
-    await expect.poll(() => groups.evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))).toEqual(['ideas-unassigned', 'ideas-demo']);
-    await expect(page.getByTestId('ideas-unassigned')).toContainText('U-1 Orphan gadget for no repo');
-    await expect(page.getByTestId('ideas-demo')).toContainText('Dark mode toggle');
-    await expect(page.getByTestId('ideas-zulu')).toHaveCount(0); // IDEAS.md with no items
-    await expect(page.getByTestId('ideas-alpha')).toHaveCount(0); // no IDEAS.md
+    await expect(page.locator('[data-testid^="why-"] h3')).toHaveText(['Needs your decision 1', 'Waiting on something 0', 'Too big, needs splitting 0', 'Not important yet 0', 'No reason yet 2', 'Maybe never 0']);
+    const decision = page.getByTestId('why-decision');
+    await expect(decision.locator('.idea-main')).toHaveText('Unassigned U-1 Orphan gadget for no repo');
+    await expect(decision.getByTestId('idea-note')).toHaveText('2026-11-18');
+    await expect(decision.getByTestId('idea-note')).toHaveCSS('font-size', '12px');
+    await expect(page.getByTestId('why-none').locator('.idea-main')).toHaveText(['demo I-1 Dark mode toggle', 'demo I-2 Something long that wraps']);
+    await expect(page.getByTestId('why-never')).not.toHaveAttribute('open');
 
-    await page.getByTestId('ideas-unassigned').getByRole('button', { name: 'Copy U-1' }).click();
-    expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe('- U-1 — Orphan gadget for no repo (2026-11-18)');
+    await decision.getByRole('button', { name: 'Copy U-1' }).click();
+    expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe('- U-1 — Orphan gadget for no repo (2026-11-18) [why: decision]');
 
-    await page.getByTestId('ideas-demo').getByRole('link', { name: 'demo' }).click();
-    await expect(page).toHaveURL(/#\/$/);
-    await expect(page.getByRole('group', { name: 'Filter by project' }).getByRole('button', { name: 'demo' })).toHaveAttribute('aria-pressed', 'true');
+    // A home row opens the Ideas page at its group.
+    await page.goto('/');
+    await page.getByTestId('lane-ideas').getByTestId('ideas-row').last().click();
+    await expect(page).toHaveURL(/#\/ideas\/none$/);
+  });
+
+  test('Ideas page: the reason dropdown (owner only) sends the right request and regroups (BL-17)', async ({ page }) => {
+    const data = { ...(await fixtureData()), canMove: true };
+    let ideas = IDEAS;
+    const sent: unknown[] = [];
+    await page.route('**/api/projects', (r) => r.fulfill({ json: data }));
+    await page.route('**/api/move', async (r) => {
+      const body = r.request().postDataJSON();
+      if (body.action === 'check') return r.fulfill({ json: { ok: true } });
+      sent.push(body);
+      ideas = setWhy(ideas, body.id, body.why).ideas;
+      return r.fulfill({ json: { ok: true, message: 'ok', updates: [{ repo: 'demo', ideas: parseIdeas(ideas) }] } });
+    });
+    await page.addInitScript(() => localStorage.setItem('backlogkit.owner', 'pw'));
+    await page.goto('/#/ideas');
+    const pick = page.getByLabel('Reason for I-2');
+    await expect(pick).toHaveValue('none');
+    await pick.selectOption({ label: 'Too big, needs splitting' });
+    await expect(page.getByTestId('why-too-big').locator('.idea-main')).toContainText('Something long that wraps');
+    await expect(page.locator('[data-testid^="why-"] h3')).toHaveText(['Needs your decision 1', 'Waiting on something 0', 'Too big, needs splitting 1', 'Not important yet 0', 'No reason yet 1', 'Maybe never 0']);
+    expect(sent).toEqual([{ action: 'reason', repo: 'demo', id: 'I-2', why: 'too-big' }]);
   });
 
   test('time estimates on the home page: item badges, lane totals only where estimated, measured times (BL-8, BL-12)', async ({ page }) => {
@@ -364,7 +388,7 @@ test.describe('mocked GitHub', () => {
 
     await page.reload(); // still unlocked in this browser
     await page.goto('/#/ideas');
-    const demoIdeas = page.getByTestId('ideas-demo');
+    const demoIdeas = page.getByTestId('why-none');
     await demoIdeas.getByRole('button', { name: /Plan I-1/ }).click();
     await expect(demoIdeas.getByTestId('idea')).toHaveCount(1);
     await expect(demoIdeas).not.toContainText('Dark mode toggle');

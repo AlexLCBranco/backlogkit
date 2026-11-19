@@ -7,7 +7,7 @@
 // An item is in exactly one lane. Within a lane items are grouped by project in the card sort order, each file's order
 // kept. The files keep their Ready / Held sections; only the screen uses the lane names. Pure functions; the page is
 // in App.tsx.
-import type { BlockedNote, BuiltItem, Data, Estimate, Idea, PlannedItem, Project, Section } from './types';
+import type { BlockedNote, BuiltItem, Data, Estimate, Idea, PlannedItem, Project, Section, Why } from './types';
 import { sortProjects, type SortKey } from './sort';
 import { itemMarkdown } from '../lib/lists.mjs';
 
@@ -19,6 +19,23 @@ export const LANES: { key: Lane; label: string; empty: string }[] = [
   { key: 'ideas', label: 'Ideas', empty: 'No ideas.' },
   { key: 'done', label: 'Done', empty: 'Nothing built in the last 7 days.' },
 ];
+/** Idea groups by why they're not planned (BL-17), in page order; "Maybe never" last and folded. */
+export type WhyKey = Why | 'none';
+export const WHY_GROUPS: { key: WhyKey; label: string; folded?: boolean }[] = [
+  { key: 'decision', label: 'Needs your decision' },
+  { key: 'waiting', label: 'Waiting on something' },
+  { key: 'too-big', label: 'Too big, needs splitting' },
+  { key: 'later', label: 'Not important yet' },
+  { key: 'none', label: 'No reason yet' },
+  { key: 'never', label: 'Maybe never', folded: true },
+];
+export const isWhyKey = (s: string | undefined): s is WhyKey => WHY_GROUPS.some((g) => g.key === s);
+
+/** Every group, in order, with its ideas (the input order kept within a group). */
+export function ideaGroups(ideas: BoardIdea[]) {
+  return WHY_GROUPS.map((g) => ({ ...g, ideas: ideas.filter((i) => (i.idea.why ?? 'none') === g.key) }));
+}
+
 export const laneLabel = (k: Lane) => LANES.find((l) => l.key === k)!.label;
 export const BUILT_DAYS = 7;
 
@@ -154,6 +171,9 @@ export function matchesText(id: string | null, hay: string, query: string): bool
 }
 export const matches = (item: BoardItem, query: string) => matchesText(item.id, `${item.title} ${item.body}`, query);
 export const ideaMatches = (i: BoardIdea, query: string) => matchesText(i.idea.id, i.idea.title, query);
+
+/** Where a project's ideas can be planned into (it has a FEATURE_BACKLOG.md). */
+export const planTargets = (data: Data) => data.projects.filter((p) => p.files.backlog).map((p) => p.repo).sort((a, b) => a.localeCompare(b));
 
 /** An empty selection means All projects. Unassigned ideas (no repo) show only then. */
 export function inFilter(item: { repo: string | null }, selected: string[]): boolean {
