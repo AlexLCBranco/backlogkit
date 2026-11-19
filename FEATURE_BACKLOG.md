@@ -36,6 +36,7 @@ the Blocked badge is small and far right.
 lane, filter applied); e2e with fixture data: the five lanes in order, strip numbers equal lane counts, clicking a
 number scrolls to its lane, an empty lane shows its line, and a text scan of every page finds none of the words Now,
 Next, Ready, Held as labels.
+**Estimate:** build ~40–60 min · suite ~0.5 min
 
 ### BL-15 — Cards anyone can read: plain sentence first, project name instead of a dot
 **In short:** Each item shows one plain sentence first, with the project's name written on it instead of a coloured dot.
@@ -49,6 +50,7 @@ Next, Ready, Held as labels.
   coloured dots: their colours repeat today (backlogkit and calendarkit look the same, so do footykit and gauntlet).
 **Tests:** parser unit (with In short, without, In short not the first line → `null`); e2e: a card shows the sentence and
 the project name as text, a card without In short shows its title and "no summary yet", no dot element remains.
+**Estimate:** build ~20–30 min · suite ~0.5 min
 
 ### BL-16 — Stuck items: show the question and answer it from the site
 **In short:** Stuck items show exactly what's needed from you, and you can type your answer right there.
@@ -68,6 +70,7 @@ the project name as text, a card without In short shows its title and "no summar
 **Tests:** unit for the replacement (bold and plain Blocked, one and several lines, followed by another `**Field:**`
 line, missing note → refused); API test with mocked GitHub (commit content and message); e2e with mocked API: Answer
 opens the box, empty Save shows the message, Save sends the right request and the Stuck count drops.
+**Estimate:** build ~30–45 min · suite ~0.5 min
 
 ### BL-17 — Ideas grouped by why they're not planned
 **In short:** Ideas are sorted into groups that say why each one isn't planned yet, and you can set the reason with one click.
@@ -89,6 +92,7 @@ opens the box, empty Save shows the message, Save sends the right request and th
 **Tests:** parser unit (each tag, no tag, unknown tag, tag on a continued indented line, end note split off); grouping
 order and counts; API unit for adding and replacing a tag; e2e with fixtures: group headings in order with counts, the
 dropdown sends the right request.
+**Estimate:** build ~40–60 min · suite ~0.5 min
 
 ### BL-18 — Done: what's new since your last visit
 **In short:** The Done box shows what got built since you last looked, grouped by project, with what you'll see in each app.
@@ -104,10 +108,12 @@ dropdown sends the right request.
 - The number strip's Done number shows the new count when above 0 and is green.
 **Tests:** unit with fixed dates (new vs seen vs older than 30 days, Internal excluded, first-visit rule); e2e: new items
 grouped by project, Mark all seen empties the list and it stays empty after reload.
+**Estimate:** build ~25–40 min · suite ~0.5 min
 
 ### BL-13 — Marquee selection on the board
 **In short:** Drag a box over items to pick several at once and copy them.
 **What:** marquee selection on backlogkit, with the same rules as the owner's other apps (calendarkit / footykit / gauntlet apps): drag on empty space to draw a box; every item line it touches is selected (highlighted); Shift or Ctrl + drag adds to the selection; click on empty space or Esc clears; a plain click on an item still opens it (no drag = no selection). Controls, chips and links never start a marquee (`data-no-marquee`). While something is selected, a small bar shows "N selected · Copy · Clear"; Copy (and Ctrl+C) copies the selected items as text in the same format as backlogkit's existing copy, in board order, grouped by project.
 **Tests:** unit: hit-testing the box against item rects, add-with-modifier, clear; e2e: drag selects the right items, click still opens an item, Esc clears, copied text matches the existing format.
+**Estimate:** build ~30–45 min · suite ~0.5 min
 
 ## Held (needs the owner's "go"; never built from "build the backlog")
