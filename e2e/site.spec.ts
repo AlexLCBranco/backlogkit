@@ -528,9 +528,15 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('selection-bar')).toHaveCount(0);
 
     // Chips and the number strip never start a marquee.
+    await page.evaluate(() => {
+      const w = window as unknown as { downs: string[] };
+      w.downs = [];
+      addEventListener('pointerdown', (e) => w.downs.push(`${(e.target as Element).outerHTML.slice(0, 90)} @${e.clientX},${e.clientY} scrollY=${scrollY}`), true);
+    });
     const chip = (await page.getByRole('button', { name: 'All projects' }).boundingBox())!;
-    await drag({ x: chip.x + 5, y: chip.y + 5 }, { x: lane.x + 300, y: third.y + 4 });
-    await expect(page.getByTestId('selection-bar')).toHaveCount(0);
+    await drag({ x: chip.x + chip.width / 2, y: chip.y + chip.height / 2 }, { x: lane.x + 300, y: third.y + 4 });
+    const why = async () => JSON.stringify({ chip, downs: await page.evaluate(() => (window as unknown as { downs: string[] }).downs), selected: await selected() });
+    await expect(page.getByTestId('selection-bar'), await why()).toHaveCount(0);
     await expect(page.getByTestId('marquee')).toBeHidden();
   });
 
