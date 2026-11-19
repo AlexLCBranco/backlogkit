@@ -1,7 +1,7 @@
 // BL-11: the text edits behind the one-click moves.
 import { describe, expect, it } from 'vitest';
-import { cutIdea, heldToReady, idPrefix, ideaToHeld, nextId } from '../lib/moves.mjs';
-import { parseBacklog, parseIdeas } from '../lib/lists.mjs';
+import { ALREADY_ANSWERED, answerBlocked, cutIdea, heldToReady, idPrefix, ideaToHeld, nextId } from '../lib/moves.mjs';
+import { parseBacklog, parseBlocked, parseIdeas } from '../lib/lists.mjs';
 import { BACKLOG, BUILT, IDEAS } from './fixtures';
 
 describe('ID numbering', () => {
@@ -63,5 +63,38 @@ describe('Next → Now (Held → Ready)', () => {
   it('only moves items that are under Held', () => {
     expect(() => heldToReady({ backlog: BACKLOG, id: 'DM-1' })).toThrow(/DM-1 is not under Held/);
     expect(() => heldToReady({ backlog: '## Held\n\n### X-1 — a\n', id: 'X-1' })).toThrow(/no "## Ready"/);
+  });
+});
+
+describe('answering a Blocked note (BL-16)', () => {
+  const answer = (backlog: string, id = 'X-1', a = 'Blue.') => answerBlocked({ backlog, id, answer: a, date: '2026-11-19' }).backlog;
+  const B = (note: string, after = '') => `## Ready\n\n### X-1 — One\n**In short:** s.\n${note}\n${after}\n### X-2 — Two\nBlocked: other item.\n`;
+  it('plain, one line', () => {
+    expect(answer(B('Blocked: which colour?'))).toBe(B('**Answered (2026-11-19):** which colour? → Blue.'));
+  });
+  it('bold, and after "- "', () => {
+    expect(answer(B('**Blocked:** which colour?'))).toBe(B('**Answered (2026-11-19):** which colour? → Blue.'));
+    expect(answer(B('- **Blocked:** which colour?'))).toBe(B('**Answered (2026-11-19):** which colour? → Blue.'));
+  });
+  it('several lines become one; the next **Field:** line and the other item are kept', () => {
+    const before = B('Blocked: which colour\n  for the header (2026-11-18)?', '**Estimate:** build ~5 min · suite ~1 min\n');
+    const after = B('**Answered (2026-11-19):** which colour for the header (2026-11-18)? → Blue.', '**Estimate:** build ~5 min · suite ~1 min\n');
+    expect(answer(before)).toBe(after);
+    expect(parseBacklog(answer(before))[0]!.items.map((i) => i.blocked)).toEqual([false, true]);
+  });
+  it('the answer is put on one line; CRLF files keep CRLF', () => {
+    expect(answer(B('Blocked: q?'), 'X-1', '  line one\n line two ')).toContain('q? → line one line two\n');
+    expect(answer(B('Blocked: q?').replace(/\n/g, '\r\n'))).toBe(B('**Answered (2026-11-19):** q? → Blue.').replace(/\n/g, '\r\n'));
+  });
+  it('refuses: no Blocked note any more, no such item, empty answer', () => {
+    expect(() => answer(B('Plain text.'))).toThrow(ALREADY_ANSWERED);
+    expect(() => answer(B('Blocked: q?'), 'X-9')).toThrow(/X-9 is not in FEATURE_BACKLOG.md/);
+    expect(() => answer(B('Blocked: q?'), 'X-1', '   ')).toThrow(/Type an answer first/);
+  });
+  it('parseBlocked reads the question and its date', () => {
+    expect(parseBlocked('x\n**Blocked:** waiting on the key (2026-11-18)\n  and more\n**Estimate:** y')).toEqual({ text: 'waiting on the key (2026-11-18) and more', date: '2026-11-18' });
+    expect(parseBlocked('- Blocked: plain')).toEqual({ text: 'plain', date: null });
+    expect(parseBlocked('nothing')).toBeNull();
+    expect(parseBacklog(B('Blocked: q?'))[0]!.items[0]!.blockedNote).toEqual({ text: 'q?', date: null });
   });
 });

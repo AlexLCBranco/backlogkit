@@ -7,7 +7,7 @@
 // An item is in exactly one lane. Within a lane items are grouped by project in the card sort order, each file's order
 // kept. The files keep their Ready / Held sections; only the screen uses the lane names. Pure functions; the page is
 // in App.tsx.
-import type { BuiltItem, Data, Estimate, Idea, PlannedItem, Project, Section } from './types';
+import type { BlockedNote, BuiltItem, Data, Estimate, Idea, PlannedItem, Project, Section } from './types';
 import { sortProjects, type SortKey } from './sort';
 import { itemMarkdown } from '../lib/lists.mjs';
 
@@ -33,6 +33,8 @@ export interface BoardItem {
   title: string;
   /** The spec's "In short" sentence (BL-15); null when it has none, and for built items. */
   short: string | null;
+  /** The Blocked note: the question for the owner (BL-16); null when not blocked. */
+  blockedNote: BlockedNote | null;
   /** What opens in place: the full spec, or the built item's sentence. */
   body: string;
   blocked: boolean;
@@ -72,6 +74,7 @@ const planned = (repo: string, section: 'ready' | 'held', i: PlannedItem, n: num
   id: i.id,
   title: i.title,
   short: i.short ?? null,
+  blockedNote: i.blockedNote ?? null,
   body: i.body,
   blocked: i.blocked,
   date: null,
@@ -87,6 +90,7 @@ const built = (repo: string, date: string, i: BuiltItem, n: number): BoardItem =
   id: i.id,
   title: i.title,
   short: null,
+  blockedNote: null,
   body: i.detail,
   blocked: false,
   date,

@@ -370,6 +370,43 @@ describe('one-click moves (BL-11)', () => {
     expect(await screen.findByTestId('move-error')).toHaveProperty('textContent', 'DM-3 is not under Held (moved already?)');
   });
 
+  it('Stuck cards show the question in red with its date; Answer only when unlocked (BL-16)', () => {
+    showAs(owner({ unlocked: false }).o, '#/');
+    const notes = within(lane('stuck')).getAllByTestId('blocked-note');
+    expect(notes.map((n) => n.textContent)).toEqual(["waiting for the owner's colour choice.", 'needs a key.']);
+    expect(within(lane('stuck')).getAllByTestId('answer-locked').map((n) => n.textContent)).toEqual(['Unlock as owner to answer', 'Unlock as owner to answer']);
+    expect(within(lane('stuck')).queryAllByTestId('answer')).toEqual([]);
+    cleanup();
+    show('#/'); // moves off: neither
+    expect(screen.queryAllByTestId('answer-locked')).toEqual([]);
+    expect(screen.queryAllByTestId('answer')).toEqual([]);
+    expect(screen.getAllByTestId('blocked-note')).toHaveLength(2);
+  });
+
+  it('Answer: empty Save is refused inline; Save sends the answer; Cancel closes (BL-16)', async () => {
+    const { o, moves } = owner();
+    showAs(o, '#/');
+    const card = within(lane('stuck')).getAllByTestId('stuck-card')[0]!;
+    fireEvent.click(within(card).getByTestId('answer'));
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(within(card).getByTestId('answer-error').textContent).toBe('Type an answer first.');
+    expect(moves).toEqual([]);
+    fireEvent.change(within(card).getByLabelText('Answer for DM-2'), { target: { value: 'Blue.' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(moves).toEqual([{ action: 'answer', repo: 'demo', id: 'DM-2', answer: 'Blue.' }]));
+    fireEvent.click(within(card).getByRole('button', { name: 'Cancel' }));
+    expect(within(card).queryByTestId('answer-form')).toBeNull();
+  });
+
+  it('Answer: a refusal from the server shows next to the box', async () => {
+    showAs(owner({ move: async () => 'Already answered — reload' }).o, '#/');
+    const card = within(lane('stuck')).getAllByTestId('stuck-card')[0]!;
+    fireEvent.click(within(card).getByTestId('answer'));
+    fireEvent.change(within(card).getByLabelText('Answer for DM-2'), { target: { value: 'x' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect((await within(card).findByTestId('answer-error')).textContent).toBe('Already answered — reload');
+  });
+
   it("applyMove puts the answer's lists into the page data", () => {
     const planned = [{ name: 'Ready', kind: 'ready' as const, items: [] }];
     const next = applyMove(data, { updates: [{ repo: 'demo', planned, ideas: [], counts: { ready: 0, held: 0, planned: 0, blocked: 0, ideas: 0 } }], unassigned: [] });

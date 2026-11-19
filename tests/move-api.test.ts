@@ -175,6 +175,30 @@ describe('/api/move (BL-11)', () => {
     expect(gh.log('demo')).toEqual(['init']);
   });
 
+  it('answer: one commit replacing the Blocked note, message "backlogkit: answer <ID>" (BL-16)', async () => {
+    const gh = fakeGithub({ demo: demo() });
+    vi.stubGlobal('fetch', gh.fetchImpl);
+    const { move } = await import('../api/move');
+    const body = await move({ action: 'answer', repo: 'demo', id: 'DM-2', answer: 'Blue, please.' }, { token: TOKEN, fetchImpl: gh.fetchImpl, now: () => new Date('2026-11-19T10:00:00Z') });
+    expect(gh.file('demo', 'FEATURE_BACKLOG.md')).toBe(BACKLOG.replace("Blocked: waiting for the owner's colour choice.", "**Answered (2026-11-19):** waiting for the owner's colour choice. → Blue, please."));
+    expect(gh.log('demo')).toEqual(['backlogkit: answer DM-2', 'init']);
+    expect(body.updates[0]!.planned![0]!.items.find((i) => i.id === 'DM-2')!.blocked).toBe(false);
+    expect(gh.calls.every((c) => c.auth === `Bearer ${TOKEN}`)).toBe(true);
+  });
+
+  it('answer: refused when already answered, empty or too long; nothing written (BL-16)', async () => {
+    const gh = fakeGithub({ demo: demo() });
+    vi.stubGlobal('fetch', gh.fetchImpl);
+    const { POST } = await import('../api/move');
+    const a = await POST(post({ action: 'answer', repo: 'demo', id: 'DM-1', answer: 'x' }));
+    expect(a.status).toBe(409);
+    expect((await a.json()).error).toBe('Already answered — reload');
+    expect((await (await POST(post({ action: 'answer', repo: 'demo', id: 'DM-2', answer: '  ' }))).json()).error).toBe('Type an answer first');
+    expect((await POST(post({ action: 'answer', repo: 'demo', id: 'DM-2', answer: 'x'.repeat(2001) }))).status).toBe(409);
+    expect((await POST(post({ action: 'answer', repo: 'demo', id: 'DM-2', answer: 'ok' }, 'wrong'))).status).toBe(401);
+    expect(gh.log('demo')).toEqual(['init']);
+  });
+
   it('/api/projects says whether moves are on', async () => {
     const { mockGithub, projectsJson } = await import('./fixtures');
     vi.stubGlobal('fetch', mockGithub({ repos: [], files: {}, projectsJson: projectsJson([]) }).fetchImpl);

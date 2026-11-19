@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fixtureData } from './fixture-data';
 import { BACKLOG, BUILT, IDEAS } from '../tests/fixtures';
-import { heldToReady, ideaToHeld } from '../lib/moves.mjs';
+import { answerBlocked, heldToReady, ideaToHeld } from '../lib/moves.mjs';
 import { counts, parseBacklog, parseIdeas } from '../lib/lists.mjs';
 
 const live = !!process.env.LIVE_URL;
@@ -380,6 +380,47 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('lane-waiting').getByTestId('board-item')).toHaveCount(1);
     await expect(page.getByTestId('owner')).toHaveText('Owner');
     await expect(page.getByTestId('move')).toHaveCount(0);
+  });
+
+  test('stuck items: the question shows in red; Answer, empty Save refused, Save sends it and Stuck drops (BL-16)', async ({ page }) => {
+    const data = { ...(await fixtureData()), canMove: true };
+    let backlog = BACKLOG;
+    const sent: unknown[] = [];
+    const demoWith = (b: string) => {
+      const planned = parseBacklog(b);
+      const list = parseIdeas(IDEAS);
+      return { repo: 'demo', planned, ideas: list, counts: counts(planned, list) };
+    };
+    await page.route('**/api/projects', (r) => r.fulfill({ json: { ...data, projects: data.projects.map((p) => (p.repo === 'demo' ? { ...p, ...demoWith(backlog) } : p)) } }));
+    await page.route('**/api/move', async (r) => {
+      const body = r.request().postDataJSON();
+      if (body.action === 'check') return r.fulfill({ json: { ok: true } });
+      sent.push(body);
+      backlog = answerBlocked({ backlog, id: body.id, answer: body.answer, date: '2026-11-19' }).backlog;
+      return r.fulfill({ json: { ok: true, message: 'ok', updates: [demoWith(backlog)] } });
+    });
+    await page.goto('/');
+    const stuck = page.getByTestId('lane-stuck');
+    await expect(stuck.getByTestId('blocked-note')).toHaveText("waiting for the owner's colour choice.");
+    await expect(stuck.getByTestId('blocked-note')).toHaveCSS('color', 'rgb(239, 107, 107)'); // the danger colour
+    await expect(stuck.getByTestId('answer-locked')).toHaveText('Unlock as owner to answer');
+    await expect(stuck.getByTestId('answer')).toHaveCount(0);
+
+    await page.getByTestId('owner').click();
+    await page.getByLabel('Owner password').fill('pw-e2e');
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await stuck.getByTestId('answer').click();
+    await stuck.getByRole('button', { name: 'Save' }).click();
+    await expect(stuck.getByTestId('answer-error')).toHaveText('Type an answer first.');
+    expect(sent).toEqual([]);
+    await stuck.getByLabel('Answer for DM-2').fill('Blue, please.');
+    await stuck.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('strip-stuck').locator('b')).toHaveText('0');
+    await expect(stuck).toContainText('Nothing stuck.');
+    expect(sent).toEqual([{ action: 'answer', repo: 'demo', id: 'DM-2', answer: 'Blue, please.' }]);
+    await expect.poll(() => lines(page, 'next')).toContain('demo | Stuck thing* | DM-2'); // back in its normal lane
+    await page.reload(); // the data from "GitHub" says the same
+    await expect(page.getByTestId('strip-stuck').locator('b')).toHaveText('0');
   });
 
   test('the token never reaches the page', async ({ page }) => {

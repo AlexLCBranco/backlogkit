@@ -5,3 +5,5 @@ export function nextId(prefix: string, ...texts: (string | null | undefined)[]):
 export function ideaToHeld(a: { ideasText: string | null; ideaId: string; backlog: string | null; built: string | null }): { ideas: string; backlog: string; id: string; title: string }
 export function cutIdea(ideasText: string | null, ideaId: string): { ideas: string; text: string }
 export function heldToReady(a: { backlog: string | null; id: string }): { backlog: string; title: string }
+export const ALREADY_ANSWERED: string
+export function answerBlocked(a: { backlog: string | null; id: string; answer: string; date: string }): { backlog: string; question: string }

@@ -8,26 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-### BL-16 — Stuck items: show the question and answer it from the site
-**In short:** Stuck items show exactly what's needed from you, and you can type your answer right there.
-**What:**
-- In the Stuck lane each card shows, under its sentence, the full text of its `Blocked:` note (the question) in the
-  danger colour, plus its date when the note has one.
-- An **Answer** button on each stuck card, shown when the owner is unlocked (BL-11's Owner password); when locked the
-  card says "Unlock as owner to answer". It opens a text box with Save and Cancel; Save is refused with an inline
-  message when the box is empty.
-- Save makes one commit to that repo's `FEATURE_BACKLOG.md` on its default branch (new action `answer` in `api/move.ts`,
-  same password and write-token checks as BL-11, commit message `backlogkit: answer <ID>`). It replaces the Blocked
-  note with one line `**Answered (YYYY-MM-DD):** <the Blocked text as it was> → <the answer>`. The Blocked note is the
-  line starting with `Blocked:` (plain or bold, optionally after "- ") through the line before the next line starting
-  with `**`, the next heading or the end of the item. If the item has no Blocked note any more, the API refuses and the
-  site says "Already answered — reload".
-- After a successful save the card leaves the Stuck lane at once and shows in its normal lane (reloaded data).
-**Tests:** unit for the replacement (bold and plain Blocked, one and several lines, followed by another `**Field:**`
-line, missing note → refused); API test with mocked GitHub (commit content and message); e2e with mocked API: Answer
-opens the box, empty Save shows the message, Save sends the right request and the Stuck count drops.
-**Estimate:** build ~30–45 min · suite ~0.5 min
-
 ### BL-17 — Ideas grouped by why they're not planned
 **In short:** Ideas are sorted into groups that say why each one isn't planned yet, and you can set the reason with one click.
 **What:**

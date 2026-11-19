@@ -1,7 +1,7 @@
 // What /api/projects answers (lib/github.mjs: loadAll).
 import type { BuiltDay, Counts, Idea, Section, SuiteRecord } from '../lib/lists.mjs';
 
-export type { BuiltDay, BuiltItem, Counts, Duration, Estimate, Idea, PlannedItem, Section, SuiteRecord } from '../lib/lists.mjs';
+export type { BlockedNote, BuiltDay, BuiltItem, Counts, Duration, Estimate, Idea, PlannedItem, Section, SuiteRecord } from '../lib/lists.mjs';
 
 export interface Project {
   repo: string;

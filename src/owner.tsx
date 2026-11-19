@@ -7,7 +7,7 @@ import type { Data, Idea } from './types';
 
 export const OWNER_STORAGE_KEY = 'backlogkit.owner';
 
-export interface MoveRequest { action: 'idea' | 'ready'; repo: string; id: string; from?: 'unassigned' }
+export interface MoveRequest { action: 'idea' | 'ready' | 'answer'; repo: string; id: string; from?: 'unassigned'; answer?: string }
 interface MoveAnswer {
   ok: true;
   message: string;

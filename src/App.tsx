@@ -203,7 +203,76 @@ export function ProjectsPage({ data, go }: { data: Data; go: (r: Route) => void 
   );
 }
 
+/**
+ * Answering a stuck item (BL-16): "Answer" opens a text box; Save writes the answer into the repo's
+ * FEATURE_BACKLOG.md (one commit) and the item leaves Stuck. Locked: a line saying how to answer. Moves off: nothing.
+ */
+function StuckAnswer({ item }: { item: BoardItem }) {
+  const o = useOwner();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!o.canMove || !item.id) return null;
+  if (!o.unlocked)
+    return (
+      <p className="muted answer-locked" data-testid="answer-locked">
+        Unlock as owner to answer
+      </p>
+    );
+  if (!open)
+    return (
+      <div className="answer-row">
+        <button type="button" className="move" data-testid="answer" onClick={() => setOpen(true)}>
+          Answer
+        </button>
+      </div>
+    );
+  const cancel = () => {
+    setOpen(false);
+    setText('');
+    setErr(null);
+  };
+  return (
+    <form
+      className="answer-form"
+      data-testid="answer-form"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!text.trim()) return setErr('Type an answer first.');
+        setBusy(true);
+        setErr(null);
+        const error = await o.move({ action: 'answer', repo: item.repo, id: item.id!, answer: text });
+        setBusy(false);
+        setErr(error); // on success the item has left Stuck and this form is gone
+      }}
+    >
+      <textarea aria-label={`Answer for ${item.id}`} rows={2} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
+      <button type="submit" disabled={busy}>{busy ? '…' : 'Save'}</button>
+      <button type="button" className="cancel" onClick={cancel} disabled={busy}>
+        Cancel
+      </button>
+      {err && (
+        <span className="error" role="alert" data-testid="answer-error">
+          {err}
+        </span>
+      )}
+    </form>
+  );
+}
+
 function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
+  if (item.lane === 'stuck')
+    return (
+      <div className={`stuck-card${first ? ' group-start' : ''}`} data-testid="stuck-card">
+        <ItemDetails item={item} first={false} />
+        <StuckAnswer item={item} />
+      </div>
+    );
+  return <ItemDetails item={item} first={first} />;
+}
+
+function ItemDetails({ item, first }: { item: BoardItem; first: boolean }) {
   const label = `Copy ${item.id ?? item.title}`;
   return (
     <details className={`bitem${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo}>
@@ -214,6 +283,12 @@ function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
           {!item.short && item.lane !== 'done' && (
             <span className="badge no-summary" data-testid="no-summary" title="This spec has no “In short” line yet">
               no summary yet
+            </span>
+          )}
+          {item.lane === 'stuck' && item.blockedNote && (
+            <span className="blocked-note" data-testid="blocked-note">
+              {item.blockedNote.text}
+              {item.blockedNote.date && <span className="note-date">{item.blockedNote.date}</span>}
             </span>
           )}
         </span>
