@@ -1,6 +1,6 @@
 // The owner's one-click moves (BL-11). Off unless the server says moves are set up (data.canMove). The owner types the
 // password once (Owner button in the top bar); it is checked by the server and kept in this browser only. Then the
-// Ideas page shows "→ Next" on each idea and the board "→ Now" on each Next item; each click is one commit on GitHub
+// Ideas page shows "Plan it" on each idea and Home "Give OK" on each Waiting item (BL-14 names); each click is one commit on GitHub
 // (api/move.ts), and the page updates from the answer.
 import { createContext, useContext, useState, type FormEvent } from 'react';
 import type { Data, Idea } from './types';

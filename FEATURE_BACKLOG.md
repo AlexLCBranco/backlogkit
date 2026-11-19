@@ -8,36 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-### BL-14 — Home page: five lanes in plain words, with a number strip on top
-**In short:** The home page becomes five clearly named boxes, stuck things first, with big numbers at the top that jump to each box.
-**Why:** the owner wants a page anyone understands at a glance (his words: "even a 5 year old"), usability first. Today's
-board says Now/Next while the files and buttons say Ready/Held, "Now 5" counts a blocked item that can't be built, and
-the Blocked badge is small and far right.
-**What:**
-- The home page shows five lanes, always in this order and always present (an empty lane shows one muted line, e.g.
-  "Nothing stuck."):
-  1. **Stuck – needs you**: every planned item with a `Blocked:` line, from Ready or Held. Red-tinted lane.
-  2. **Will be built next**: Ready items that are not blocked, per repo in file order.
-  3. **Waiting for your OK**: Held items that are not blocked.
-  4. **Ideas**: one row per reason group with its count (filled in by BL-17; until then one row "N ideas" linking to
-     the Ideas page).
-  5. **Done**: the built list (BL-18 makes it "new since your last visit"; until then the last 7 days, open, not folded).
-  An item is in exactly one lane; a blocked item is never counted in lanes 2 or 3.
-- A number strip at the very top: five big numbers with the lane name under each; clicking one scrolls to its lane.
-  The Stuck number has a red background when above 0 and is grey at 0.
-- One vocabulary on screen. These lane names replace Now / Next / Ready / Held / Planned in every place the owner reads
-  words: lane titles, buttons, tooltips, project cards' counts, tab titles. Buttons: "→ Now" becomes **Give OK**
-  (Waiting → Will be built next) and "→ Next" on ideas becomes **Plan it** (idea → Waiting for your OK). The files keep
-  their Ready / Held sections; only the screen changes.
-- Project filter chips stay, bigger (at least 32 px tall), with an **All projects** chip first; the filter applies to
-  the five lanes and the number strip.
-- The search box placeholder says "Search everything…" and searches all lanes and ideas, on every page.
-**Tests:** unit: lane assignment (blocked in Ready → Stuck, blocked in Held → Stuck, never counted twice, counts per
-lane, filter applied); e2e with fixture data: the five lanes in order, strip numbers equal lane counts, clicking a
-number scrolls to its lane, an empty lane shows its line, and a text scan of every page finds none of the words Now,
-Next, Ready, Held as labels.
-**Estimate:** build ~40–60 min · suite ~0.5 min
-
 ### BL-15 — Cards anyone can read: plain sentence first, project name instead of a dot
 **In short:** Each item shows one plain sentence first, with the project's name written on it instead of a coloured dot.
 **What:**

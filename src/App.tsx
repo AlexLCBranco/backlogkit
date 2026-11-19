@@ -1,7 +1,7 @@
-// The site: the Board (home: Now, Next and Built stacked, across all repos, BL-9/BL-12), Projects (one compact card each,
-// BL-10), Ideas, and the full Built list; search from the top bar filters the board. Routes live in the hash:
-// #/ (board), #/projects, #/ideas, #/built, plus ?q=<search>. Old #/p/<repo> URLs open the board filtered to that
-// repo; old #/all opens the board.
+// The site: Home (five lanes across all repos with a number strip on top, BL-14), Projects (one compact card each,
+// BL-10), Ideas, and Everything built; search from the top bar shows Home filtered. Routes live in the hash:
+// #/ (home), #/projects, #/ideas, #/built, plus ?q=<search>. Old #/p/<repo> URLs open Home filtered to that repo; old
+// #/all opens Home.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Data, Estimate, Idea, Project } from './types';
 import { SiteVersion } from './SiteVersion';
@@ -11,18 +11,20 @@ import { MoveButton, OwnerContext, OwnerControl, useOwner, useOwnerState } from 
 import { SORT_OPTIONS, loadSort, saveSort, sortProjects, type SortKey } from './sort';
 import { estimateTotal, formatDuration, ideaMarkdown } from '../lib/lists.mjs';
 import {
-  BUILT_DAYS,
-  COLUMNS,
+  LANES,
+  boardIdeas,
   boardItems,
-  builtCounts,
   builtCutoff,
   builtGroups,
+  ideaMatches,
   inFilter,
+  laneCounts,
   loadFilter,
   matches,
-  repoColor,
+  projectLaneCounts,
   saveFilter,
   type BoardItem,
+  type Lane,
 } from './board';
 
 /** A field nobody filled in shows as a dash, never a guess. */
@@ -94,7 +96,7 @@ export function titleOf(route: Route, q = ''): string {
   if (route.page === 'projects') return 'backlogkit · Projects';
   if (route.page === 'ideas') return 'backlogkit · Ideas';
   if (route.page === 'built') return 'backlogkit · Built';
-  return 'backlogkit · Board';
+  return 'backlogkit · Home';
 }
 
 export const hrefOf = (route: Route) =>
@@ -124,7 +126,7 @@ export function cardTooltip(p: Project): string {
 }
 
 export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
-  const c = p.counts;
+  const lanes = projectLaneCounts(p);
   return (
     <article className={`card${onOpen ? ' clickable' : ''}`} data-testid={`card-${p.repo}`} onClick={onOpen} title={cardTooltip(p)}>
       <header>
@@ -150,8 +152,8 @@ export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
           DASH
         ) : (
           <>
-            Planned <b>{c.planned}</b> <span className="muted">(Ready {c.ready} / Held {c.held})</span> · Blocked{' '}
-            <b className={c.blocked ? 'blocked-count' : ''}>{c.blocked}</b> · Ideas <b>{c.ideas}</b>
+            Stuck <b className={lanes.stuck ? 'blocked-count' : ''}>{lanes.stuck}</b> · Will be built next <b>{lanes.next}</b> · Waiting for your OK{' '}
+            <b>{lanes.waiting}</b> · Ideas <b>{lanes.ideas}</b>
           </>
         )}
       </p>
@@ -201,21 +203,17 @@ export function ProjectsPage({ data, go }: { data: Data; go: (r: Route) => void 
   );
 }
 
-/** A repo's colour dot; the name shows on hover. */
-function RepoDot({ repo }: { repo: string }) {
-  return <span className="dot" data-testid="repo-dot" title={repo} aria-label={repo} role="img" style={{ background: repoColor(repo) }} />;
-}
-
-function BoardLine({ item, first, dot }: { item: BoardItem; first: boolean; dot: boolean }) {
+function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
   const label = `Copy ${item.id ?? item.title}`;
   return (
-    <details className={`bitem${item.blocked ? ' is-blocked' : ''}${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo}>
+    <details className={`bitem${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo}>
       <summary>
-        {dot && <RepoDot repo={item.repo} />}
+        <span className="tag" data-testid="repo-label">{item.repo}</span>
         {item.id && <span className="id">{item.id}</span>}
         <span className="title">{item.title}</span>
-        {item.blocked && <span className="badge blocked">Blocked</span>}
-        {item.column === 'next' && item.id && <MoveButton label="→ Now" title={`Move ${item.id} to Now (Held → Ready in ${item.repo})`} req={{ action: 'ready', repo: item.repo, id: item.id }} />}
+        {item.lane === 'waiting' && item.id && (
+          <MoveButton label="Give OK" title={`Give OK to ${item.id}: it moves to “Will be built next” in ${item.repo}`} req={{ action: 'ready', repo: item.repo, id: item.id }} />
+        )}
         <CopyButton text={item.markdown} label={label} />
       </summary>
       <div className="body">
@@ -232,14 +230,50 @@ function BoardLine({ item, first, dot }: { item: BoardItem; first: boolean; dot:
   );
 }
 
-const NOTHING = <p className="muted empty">Nothing here</p>;
+const laneId = (k: Lane) => `lane-${k}`;
+
+/** Five big numbers, one per lane; a click scrolls to that lane. */
+function NumberStrip({ counts }: { counts: Record<Lane, number> }) {
+  return (
+    <nav className="strip" aria-label="Lanes" data-testid="strip">
+      {LANES.map((l) => (
+        <button
+          key={l.key}
+          type="button"
+          className={`strip-n strip-${l.key}${counts[l.key] ? ' has' : ''}`}
+          data-testid={`strip-${l.key}`}
+          title={`Go to “${l.label}”`}
+          onClick={() => document.getElementById(laneId(l.key))?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        >
+          <b>{counts[l.key]}</b>
+          <span>{l.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function Lane({ k, count, children, extra }: { k: Lane; count: number; children: ReactNode; extra?: ReactNode }) {
+  const l = LANES.find((x) => x.key === k)!;
+  return (
+    <section id={laneId(k)} className={`lane lane-${k}${count ? '' : ' is-empty'}`} data-testid={laneId(k)}>
+      <h2>
+        {l.label} <span className="muted count">{count}</span>
+      </h2>
+      {extra}
+      {count ? children : <p className="muted empty">{l.empty}</p>}
+    </section>
+  );
+}
+
+const grouped = (list: BoardItem[]) => list.map((i, n) => <BoardLine key={i.key} item={i} first={n > 0 && list[n - 1]!.repo !== i.repo} />);
 
 /**
- * The home board (BL-9, BL-12): Now, Next and Built stacked full width. `only` (from an old project URL or a project
- * card) selects that one project; otherwise the chips this browser remembers. Built is one collapsed line until
- * clicked; while searching it looks through every day, not just the last 7, and opens so the matches show.
+ * The home page (BL-14): the number strip, project chips, then the five lanes in fixed order. `only` (from an old
+ * project URL or a project card) selects that one project; otherwise the chips this browser remembers. While
+ * searching, Done looks through every day and Ideas lists the matching ideas.
  */
-export function Board({ data, q, only, now }: { data: Data; q: string; only?: string; now?: Date }) {
+export function Home({ data, q, only, now }: { data: Data; q: string; only?: string; now?: Date }) {
   const sort = loadSort();
   const projects = useMemo(() => sortProjects(data.projects.filter((p) => !p.noFiles), sort), [data, sort]);
   const resolve = (name: string) => projects.find((p) => p.repo.toLowerCase() === name.toLowerCase())?.repo;
@@ -254,27 +288,27 @@ export function Board({ data, q, only, now }: { data: Data; q: string; only?: st
       saveFilter([one]);
     }
   }, [only, projects]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [builtOpen, setBuiltOpen] = useState(false);
   const choose = (next: string[]) => {
     setSelected(next);
     saveFilter(next);
   };
   const valid = selected.filter((s) => projects.some((p) => p.repo === s));
-  const dots = valid.length !== 1; // one repo shown: a dot would say nothing
   const searching = !!q.trim();
   const cutoff = builtCutoff(now ?? new Date());
   const items = useMemo(() => boardItems(data, sort, searching ? null : cutoff), [data, sort, searching, cutoff]);
+  const ideas = useMemo(() => boardIdeas(data, sort), [data, sort]);
   const visible = items.filter((i) => inFilter(i, valid) && matches(i, q));
-  const builtLabel = searching ? 'Built' : `Built (${BUILT_DAYS} days)`;
+  const visibleIdeas = ideas.filter((i) => inFilter(i, valid) && ideaMatches(i, q));
+  const counts = laneCounts(visible, visibleIdeas);
+  const of = (k: Lane) => visible.filter((i) => i.lane === k);
   const groups = builtGroups(visible);
-  const builtTotal = groups.reduce((n, g) => n + g.items.length, 0);
-  const open = builtTotal > 0 && (builtOpen || searching);
 
   return (
     <div className="board-page">
+      <NumberStrip counts={counts} />
       <div className="chips" role="group" aria-label="Filter by project">
         <button type="button" className="chip" aria-pressed={!valid.length} onClick={() => choose([])}>
-          All
+          All projects
         </button>
         {projects.map((p) => {
           const on = valid.includes(p.repo);
@@ -287,61 +321,64 @@ export function Board({ data, q, only, now }: { data: Data; q: string; only?: st
         {searching && <span className="muted search-note">matching “{q.trim()}”</span>}
       </div>
       <div className="board">
-        {COLUMNS.filter((c) => c.key !== 'built').map((c) => {
-          const list = visible.filter((i) => i.column === c.key);
-          return (
-            <section key={c.key} className={`col col-${c.key}${list.length ? '' : ' is-empty'}`} data-testid={`col-${c.key}`}>
-              <h2>
-                {c.label} <span className="muted count">{list.length}</span>
-              </h2>
-              <EstimateTotal items={list} />
-              {!list.length && NOTHING}
-              {list.map((i, n) => (
-                <BoardLine key={i.key} item={i} dot={dots} first={n > 0 && list[n - 1]!.repo !== i.repo} />
+        <Lane k="stuck" count={counts.stuck}>{grouped(of('stuck'))}</Lane>
+        <Lane k="next" count={counts.next} extra={<EstimateTotal items={of('next')} />}>{grouped(of('next'))}</Lane>
+        <Lane k="waiting" count={counts.waiting} extra={<EstimateTotal items={of('waiting')} />}>{grouped(of('waiting'))}</Lane>
+        <Lane k="ideas" count={counts.ideas}>
+          {searching ? (
+            <ul className="idea-list">
+              {visibleIdeas.map((i) => (
+                <li key={i.key} data-testid="idea">
+                  <ProjectLabel repo={i.repo} /> {i.idea.id && <span className="id">{i.idea.id}</span>} {i.idea.title}
+                </li>
               ))}
-            </section>
-          );
-        })}
-        <section className={`col col-built${builtTotal ? '' : ' is-empty'}`} data-testid="col-built">
-          <h2>
-            <button type="button" className="fold" aria-expanded={open} disabled={!builtTotal} onClick={() => setBuiltOpen(!open)} data-testid="built-toggle">
-              {builtTotal > 0 && <span className="caret" aria-hidden="true">{open ? '▾' : '▸'}</span>}
-              {builtLabel} <span className="muted count">{builtTotal}</span>
-              {builtTotal > 0 && <span className="muted built-counts" data-testid="built-counts"> — {builtCounts(groups)}</span>}
-            </button>
-          </h2>
-          {!builtTotal && NOTHING}
-          {open &&
-            groups.map((g) => (
-              <div key={g.repo} className="repo-group" data-testid="built-group" data-repo={g.repo}>
-                <h3>
-                  {dots && <RepoDot repo={g.repo} />}
-                  {g.repo} <span className="muted count">{g.items.length}</span>
-                </h3>
-                {g.items.map((i) => (
-                  <BoardLine key={i.key} item={i} dot={false} first={false} />
-                ))}
-              </div>
-            ))}
-          {open && (
-            <p className="all-built">
-              <a href={hrefOf({ page: 'built' })}>All built</a>
+            </ul>
+          ) : (
+            <p className="ideas-row" data-testid="ideas-row">
+              <a href={hrefOf({ page: 'ideas' })}>
+                {counts.ideas} {counts.ideas === 1 ? 'idea' : 'ideas'}
+              </a>
             </p>
           )}
-        </section>
+        </Lane>
+        <Lane k="done" count={counts.done}>
+          {groups.map((g) => (
+            <div key={g.repo} className="repo-group" data-testid="built-group" data-repo={g.repo}>
+              <h3>
+                {g.repo} <span className="muted count">{g.items.length}</span>
+              </h3>
+              {g.items.map((i) => (
+                <BoardLine key={i.key} item={i} first={false} />
+              ))}
+            </div>
+          ))}
+          <p className="all-built">
+            <a href={hrefOf({ page: 'built' })}>Everything built</a>
+          </p>
+        </Lane>
       </div>
     </div>
   );
 }
 
+/** A project's name as a neutral label; null = an unassigned idea. */
+export function ProjectLabel({ repo }: { repo: string | null }) {
+  return repo === null ? (
+    <span className="tag tag-unassigned" data-testid="repo-label">Unassigned</span>
+  ) : (
+    <span className="tag" data-testid="repo-label">{repo}</span>
+  );
+}
+
+
 /** Every repo's built items, by day, newest first (the board's "All built" link). */
 export function BuiltPage({ data }: { data: Data }) {
   const sort = loadSort();
-  const items = boardItems(data, sort, null).filter((i) => i.column === 'built');
+  const items = boardItems(data, sort, null).filter((i) => i.lane === 'done');
   const days = [...new Set(items.map((i) => i.date!))];
   return (
     <section className="built-page" data-testid="all-built">
-      <h2>All built</h2>
+      <h2>Everything built</h2>
       {!days.length && <p className="muted">Nothing built anywhere.</p>}
       {days.map((date) => (
         <div key={date} className="section" data-testid="all-built-day">
@@ -351,7 +388,7 @@ export function BuiltPage({ data }: { data: Data }) {
               .filter((i) => i.date === date)
               .map((i) => (
                 <li key={i.key}>
-                  <span className="tag">{i.repo}</span> {i.id && <span className="id">{i.id}</span>} {i.title}
+                  <ProjectLabel repo={i.repo} /> {i.id && <span className="id">{i.id}</span>} {i.title}
                   <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
                   <TookBadge t={i.took} />
                   {i.body && <div className="muted detail">{i.body}</div>}
@@ -364,7 +401,7 @@ export function BuiltPage({ data }: { data: Data }) {
   );
 }
 
-/** An unassigned idea's move: pick the repo it goes to, then → Next (BL-11). */
+/** An unassigned idea's move: pick the repo it goes to, then Plan it (BL-11). */
 function UnassignedMove({ idea, targets }: { idea: Idea; targets: string[] }) {
   const [to, setTo] = useState('');
   if (!useOwner().unlocked) return null;
@@ -376,7 +413,7 @@ function UnassignedMove({ idea, targets }: { idea: Idea; targets: string[] }) {
           <option key={t} value={t}>{t}</option>
         ))}
       </select>
-      <MoveButton label="→ Next" title={`Move ${idea.id} to Next (Held) in ${to || 'the chosen repo'}`} req={to ? { action: 'idea', repo: to, id: idea.id!, from: 'unassigned' } : null} />
+      <MoveButton label="Plan it" title={`Plan ${idea.id}: it moves to “Waiting for your OK” in ${to || 'the chosen repo'}`} req={to ? { action: 'idea', repo: to, id: idea.id!, from: 'unassigned' } : null} />
     </>
   );
 }
@@ -390,7 +427,7 @@ function IdeaList({ ideas, repo, targets = [] }: { ideas: Idea[]; repo?: string 
           {i.id && <span className="id">{i.id}</span>} {i.title}
           <CopyButton text={ideaMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
           {i.id && repo === 'unassigned' && <UnassignedMove idea={i} targets={targets} />}
-          {i.id && repo && repo !== 'unassigned' && <MoveButton label="→ Next" title={`Move ${i.id} to Next (Held in ${repo})`} req={{ action: 'idea', repo, id: i.id }} />}
+          {i.id && repo && repo !== 'unassigned' && <MoveButton label="Plan it" title={`Plan ${i.id}: it moves to “Waiting for your OK” in ${repo}`} req={{ action: 'idea', repo, id: i.id }} />}
         </li>
       ))}
     </ul>
@@ -441,14 +478,14 @@ export function Notices({ data }: { data: Data }) {
   );
 }
 
-/** Everything below the top bar, for a given state (no fetching; tests render this directly). A query shows the board. */
+/** Everything below the top bar, for a given state (no fetching; tests render this directly). A query shows the home page. */
 export function View({ data, route, q, go, now }: { data: Data; route: Route; q: string; go: (r: Route) => void; now?: Date }) {
   if (!q.trim()) {
     if (route.page === 'projects') return <ProjectsPage data={data} go={go} />;
     if (route.page === 'ideas') return <IdeasPage data={data} />;
     if (route.page === 'built') return <BuiltPage data={data} />;
   }
-  return <Board data={data} q={q} only={route.page === 'board' ? route.only : undefined} now={now} />;
+  return <Home data={data} q={q} only={route.page === 'board' ? route.only : undefined} now={now} />;
 }
 
 export function App() {
@@ -503,10 +540,10 @@ export function App() {
         <a className="brand" href="#/" onClick={() => setQ('')}>
           <img src="/logo.svg" alt="" width="20" height="20" data-testid="logo" /> backlogkit
         </a>
-        <a href="#/" className={onBoard ? 'on' : ''}>Board</a>
+        <a href="#/" className={onBoard ? 'on' : ''}>Home</a>
         <a href="#/projects" className={route.page === 'projects' && !q ? 'on' : ''}>Projects</a>
         <a href="#/ideas" className={route.page === 'ideas' && !q ? 'on' : ''}>Ideas</a>
-        <input type="search" placeholder="Search the board by text or ID…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input type="search" placeholder="Search everything…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
         {data && <span className="muted stamp" title={`Read from GitHub at ${data.generatedAt}`}>read {new Date(data.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
         <OwnerControl />
       </nav>

@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-19
+- BL-14 — Home page: five lanes in plain words, with a number strip on top (v1.10.0) (took 8 min, suite 0.4 min)
+  The home page is now five boxes (Stuck – needs you, Will be built next, Waiting for your OK, Ideas, Done) with big clickable numbers on top, bigger project chips, and buttons named Give OK and Plan it.
 - Fix: the site failed to load after v1.9.0 (v1.9.1)
   The project list loads again; v1.9.0's server code had an import that works in tests but not on Vercel.
 - BL-11 — One-click moves: idea → Next (Ideas page), Next → Now (board) (v1.9.0) (took 8 min, suite 0.4 min)

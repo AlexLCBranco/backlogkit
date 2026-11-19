@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { OwnerContext, applyMove, type MoveRequest, type Owner } from '../src/owner';
 import { loadAll } from '../lib/github.mjs';
 import { View, parseHash, titleOf, cardTooltip } from '../src/App';
-import { FILTER_STORAGE_KEY, boardItems, builtCounts, builtCutoff, builtGroups, matches, repoColor } from '../src/board';
+import { FILTER_STORAGE_KEY, LANES, boardIdeas, boardItems, builtCutoff, builtGroups, ideaMatches, laneCounts, laneOf, matches } from '../src/board';
 import type { Data } from '../src/types';
 import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from './fixtures';
 
@@ -31,137 +31,135 @@ const show = (hash: string, now = NOW) => {
   const { route, q } = parseHash(hash);
   return render(<View data={data} route={route} q={q} go={() => {}} now={now} />);
 };
-const col = (key: string) => screen.getByTestId(`col-${key}`);
-const lines = (key: string) => within(col(key)).queryAllByTestId('board-item').map((i) => i.querySelector('summary')!.textContent);
-const heads = () => screen.getAllByTestId(/^col-/).map((c) => c.querySelector('h2')!.textContent);
-const openBuilt = () => fireEvent.click(screen.getByTestId('built-toggle'));
-const dotsOf = (key: string) => within(col(key)).queryAllByTestId('repo-dot').map((d) => d.getAttribute('title'));
+const lane = (key: string) => screen.getByTestId(`lane-${key}`);
+const lines = (key: string) => within(lane(key)).queryAllByTestId('board-item').map((i) => i.querySelector('summary')!.textContent);
+const heads = () => screen.getAllByTestId(/^lane-/).map((c) => c.querySelector('h2')!.textContent);
+const strip = () => LANES.map((l) => screen.getByTestId(`strip-${l.key}`).querySelector('b')!.textContent);
+const ALL_HEADS = ['Stuck – needs you 2', 'Will be built next 2', 'Waiting for your OK 1', 'Ideas 3', 'Done 5'];
 
-describe('board (BL-9, redesigned in BL-12)', () => {
-  it('is the home page: Now, Next, Built stacked in that order, with counts; no Later', () => {
+describe('home page: five lanes (BL-14)', () => {
+  it('shows the five lanes in fixed order with counts, and the number strip with the same numbers', () => {
     show('#/');
-    expect(screen.getAllByTestId(/^col-/).map((c) => c.dataset.testid)).toEqual(['col-now', 'col-next', 'col-built']);
-    expect(heads()).toEqual(['Now 3', 'Next 2', '▸Built (7 days) 5 — demo 4 · other 1']);
-    expect(screen.queryByTestId('col-later')).toBeNull();
-    expect(screen.queryByTestId('board-summary')).toBeNull(); // the repeated "Now 1 · Next 1 · …" line is gone
+    expect(screen.getAllByTestId(/^lane-/).map((c) => c.dataset.testid)).toEqual(['lane-stuck', 'lane-next', 'lane-waiting', 'lane-ideas', 'lane-done']);
+    expect(heads()).toEqual(ALL_HEADS);
+    expect(strip()).toEqual(['2', '2', '1', '3', '5']);
+    expect([...screen.getByTestId('strip').querySelectorAll('span')].map((s) => s.textContent)).toEqual(LANES.map((l) => l.label));
   });
-  it('no idea (I-n or U-n) is ever on the board, not even when searched for', () => {
+  it('lane assignment: blocked in Ready → Stuck, blocked in Held → Stuck, never counted twice', () => {
+    expect(laneOf('ready', true)).toBe('stuck');
+    expect(laneOf('held', true)).toBe('stuck');
+    expect(laneOf('ready', false)).toBe('next');
+    expect(laneOf('held', false)).toBe('waiting');
+    const items = boardItems(data, 'name-asc', builtCutoff(NOW));
+    const ids = items.filter((i) => i.lane !== 'done').map((i) => i.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(laneCounts(items, boardIdeas(data, 'name-asc'))).toEqual({ stuck: 2, next: 2, waiting: 1, ideas: 3, done: 5 });
     show('#/');
-    openBuilt();
+    expect(lines('stuck')).toEqual(['demoDM-2Stuck thing', 'otherOT-11Other held']);
+    expect(lines('next')).toEqual(['demoDM-1First thing', 'otherOT-10Other ten']);
+    expect(lines('waiting')).toEqual(['demoDM-3Later thing']);
+  });
+  it('the Stuck number is red above 0 and grey at 0', () => {
+    show('#/');
+    expect(screen.getByTestId('strip-stuck').classList.contains('has')).toBe(true);
+    cleanup();
+    show('#/?q=DM-1');
+    expect(screen.getByTestId('strip-stuck').classList.contains('has')).toBe(false);
+  });
+  it('clicking a number scrolls to its lane', () => {
+    show('#/');
+    const seen: string[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      seen.push(this.id);
+    };
+    for (const l of LANES) fireEvent.click(screen.getByTestId(`strip-${l.key}`));
+    expect(seen).toEqual(LANES.map((l) => `lane-${l.key}`));
+  });
+  it('an empty lane shows one muted line', () => {
+    show('#/?q=DM-3', new Date(2027, 5, 1));
+    expect(within(lane('stuck')).getByText('Nothing stuck.').className).toContain('muted');
+    expect(within(lane('next')).getByText('Nothing to build next.')).toBeTruthy();
+    expect(within(lane('ideas')).getByText('No ideas.')).toBeTruthy();
+    expect(within(lane('done')).getByText('Nothing built in the last 7 days.')).toBeTruthy();
+    expect(lane('stuck').classList.contains('is-empty')).toBe(true);
+    expect(lane('waiting').classList.contains('is-empty')).toBe(false);
+  });
+  it('Ideas is one row linking to the Ideas page; no idea is in another lane', () => {
+    show('#/');
+    expect(within(lane('ideas')).getByRole('link', { name: '3 ideas' }).getAttribute('href')).toBe('#/ideas');
     const text = screen.getAllByTestId('board-item').map((i) => i.textContent).join('\n');
     expect(text).not.toMatch(/\b[IU]-\d+/);
-    expect(text).not.toContain('Dark mode toggle');
-    expect(boardItems(data, 'name-asc', null).some((i) => /^[IU]-/.test(i.id ?? ''))).toBe(false);
-    cleanup();
-    show('#/?q=dark mode');
-    expect(screen.queryAllByTestId('board-item')).toHaveLength(0);
   });
-  it('a Held item lands in Next, a Ready item in Now; the repo is a colour dot, the name on hover', () => {
+  it('Done is the last 7 days, open, grouped by repo, with a link to everything built', () => {
     show('#/');
-    expect(lines('next')).toEqual(['DM-3Later thing', 'OT-11Other heldBlocked']);
-    expect(lines('now')).toEqual(['DM-1First thing', 'DM-2Stuck thingBlocked', 'OT-10Other ten']);
-    expect(dotsOf('now')).toEqual(['demo', 'demo', 'other']);
-    const [a, , c] = within(col('now')).getAllByTestId('repo-dot') as HTMLElement[];
-    expect(a!.style.background).not.toBe('');
-    expect(c!.style.background).not.toBe(a!.style.background);
-    expect(repoColor('demo')).toBe(repoColor('demo')); // stable
-    expect(document.querySelector('.bitem .tag')).toBeNull(); // no grey text pill
-  });
-  it('a Blocked item keeps its section with a badge', () => {
-    show('#/');
-    expect(within(col('now')).getAllByText('Blocked')).toHaveLength(1);
-  });
-  it('Built is one collapsed line with per-repo counts; a click opens it grouped by repo, each repo once', () => {
-    show('#/');
-    expect(screen.getByTestId('built-toggle').getAttribute('aria-expanded')).toBe('false');
-    expect(screen.getByTestId('built-counts').textContent).toBe(' — demo 4 · other 1');
-    expect(lines('built')).toEqual([]);
-    openBuilt();
-    expect(screen.getByTestId('built-toggle').getAttribute('aria-expanded')).toBe('true');
     expect(screen.getAllByTestId('built-group').map((g) => g.dataset.repo)).toEqual(['demo', 'other']);
-    expect(lines('built')).toEqual(['DM-5Newest thing (v1.3.0)', 'A fix without ID (v1.2.1)', 'v1.2.0: old style line', 'DM-0Older thing (v1.1.0)', 'OT-1Other built (v2.0.0)']);
-    expect(within(col('built')).getByRole('link', { name: 'All built' }).getAttribute('href')).toBe('#/built');
-    openBuilt();
-    expect(lines('built')).toEqual([]);
-  });
-  it('Built groups: most items first, each repo once, newest first within a repo', () => {
-    const g = builtGroups(boardItems(data, 'name-asc', null));
-    expect(g.map((x) => x.repo)).toEqual(['demo', 'other']);
-    expect(g[0]!.items.map((i) => i.date)).toEqual(['2026-11-17', '2026-11-17', '2026-11-16', '2026-11-15']);
-    expect(builtCounts(g)).toBe('demo 4 · other 1');
-  });
-  it('Built keeps the last 7 days only', () => {
+    expect(lines('done')).toEqual(['demoDM-5Newest thing (v1.3.0)', 'demoA fix without ID (v1.2.1)', 'demov1.2.0: old style line', 'demoDM-0Older thing (v1.1.0)', 'otherOT-1Other built (v2.0.0)']);
+    expect(within(lane('done')).getByRole('link', { name: 'Everything built' }).getAttribute('href')).toBe('#/built');
+    cleanup();
     show('#/', new Date(2026, 10, 22, 12)); // 7 days: 2026-11-16 … 2026-11-22
-    openBuilt();
-    expect(lines('built')).toEqual(['DM-5Newest thing (v1.3.0)', 'A fix without ID (v1.2.1)', 'v1.2.0: old style line', 'OT-1Other built (v2.0.0)']);
+    expect(lines('done')).toHaveLength(4);
     expect(builtCutoff(new Date(2026, 10, 22, 23, 59))).toBe('2026-11-16');
     expect(builtCutoff(new Date(2026, 11, 3))).toBe('2026-11-27');
   });
-  it('an empty section shows one muted "Nothing here", not an empty box; empty Built cannot be opened', () => {
-    show('#/', new Date(2027, 5, 1));
-    expect(col('built').classList.contains('is-empty')).toBe(true);
-    expect(within(col('built')).getByText('Nothing here')).toBeTruthy();
-    expect((screen.getByTestId('built-toggle') as HTMLButtonElement).disabled).toBe(true);
-    cleanup();
-    show('#/?q=OT-10');
-    expect(within(col('next')).getByText('Nothing here').className).toContain('muted');
-    expect(col('next').classList.contains('is-empty')).toBe(true);
-    expect(col('now').classList.contains('is-empty')).toBe(false);
+  it('Done groups: most items first, each repo once, newest first within a repo', () => {
+    const g = builtGroups(boardItems(data, 'name-asc', null));
+    expect(g.map((x) => x.repo)).toEqual(['demo', 'other']);
+    expect(g[0]!.items.map((i) => i.date)).toEqual(['2026-11-17', '2026-11-17', '2026-11-16', '2026-11-15']);
   });
-  it('no "no estimates yet" line; a total only where something is estimated', () => {
+  it('a line opens the full spec in place and closes again; every item has a copy button', () => {
     show('#/');
-    expect(screen.queryByTestId('estimate-total')).toBeNull();
-    expect(document.body.textContent).not.toContain('no estimates yet');
-  });
-  it('a line opens the full spec in place and closes again', () => {
-    show('#/');
-    const item = within(col('now')).getAllByTestId('board-item')[0] as HTMLDetailsElement;
+    const item = within(lane('next')).getAllByTestId('board-item')[0] as HTMLDetailsElement;
     expect(item.open).toBe(false);
     fireEvent.click(item.querySelector('summary')!);
     expect(item.open).toBe(true);
     expect(item.querySelector('.body')!.textContent).toContain('Line one of the spec.\n- a bullet');
     fireEvent.click(item.querySelector('summary')!);
     expect(item.open).toBe(false);
-  });
-  it('every item has a copy button', () => {
-    show('#/');
-    openBuilt();
     for (const i of screen.getAllByTestId('board-item')) expect(within(i).getByRole('button', { name: /^Copy / })).toBeTruthy();
   });
-  it('project chips filter the board and are remembered; All clears; one repo shown hides the dots', () => {
+  it('no "no estimates yet" line; a total only where something is estimated', () => {
     show('#/');
+    expect(screen.queryByTestId('estimate-total')).toBeNull();
+    expect(document.body.textContent).not.toContain('no estimates yet');
+  });
+  it('project chips (All projects first) filter the lanes and the strip, and are remembered', () => {
+    show('#/');
+    const chips = within(screen.getByRole('group', { name: 'Filter by project' })).getAllByRole('button');
+    expect(chips[0]!.textContent).toBe('All projects');
     fireEvent.click(screen.getByRole('button', { name: 'other' }));
-    expect(heads()).toEqual(['Now 1', 'Next 1', '▸Built (7 days) 1 — other 1']);
-    expect(screen.queryAllByTestId('repo-dot')).toHaveLength(0);
-    openBuilt();
-    expect(screen.queryAllByTestId('repo-dot')).toHaveLength(0);
+    expect(heads()).toEqual(['Stuck – needs you 1', 'Will be built next 1', 'Waiting for your OK 0', 'Ideas 0', 'Done 1']); // unassigned ideas only under All
+    expect(strip()).toEqual(['1', '1', '0', '0', '1']);
     expect(JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY)!)).toEqual(['other']);
     cleanup();
     show('#/');
     expect(screen.getByRole('button', { name: 'other' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'demo' }));
-    expect(lines('now')).toHaveLength(3);
-    expect(dotsOf('now')).toEqual(['demo', 'demo', 'other']); // two repos: dots again
-    fireEvent.click(screen.getByRole('button', { name: 'All' }));
-    expect(screen.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true');
-    expect(heads()).toEqual(['Now 3', 'Next 2', '▸Built (7 days) 5 — demo 4 · other 1']);
+    expect(heads()).toEqual(['Stuck – needs you 2', 'Will be built next 2', 'Waiting for your OK 1', 'Ideas 2', 'Done 5']);
+    fireEvent.click(screen.getByRole('button', { name: 'All projects' }));
+    expect(screen.getByRole('button', { name: 'All projects' }).getAttribute('aria-pressed')).toBe('true');
+    expect(heads()).toEqual(ALL_HEADS);
   });
-  it('an old project URL opens the board filtered to that project (any spelling)', () => {
+  it('an old project URL opens the home page filtered to that project (any spelling)', () => {
     expect(parseHash('#/p/demo').route).toEqual({ page: 'board', only: 'demo' });
     expect(parseHash('#/all').route).toEqual({ page: 'board' });
     show('#/p/OTHER');
     expect(screen.getByRole('button', { name: 'other' }).getAttribute('aria-pressed')).toBe('true');
-    expect(lines('now')).toEqual(['OT-10Other ten']);
+    expect(lines('next')).toEqual(['otherOT-10Other ten']);
     expect(JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY)!)).toEqual(['other']);
   });
-  it('the old project page and All repos view are gone', () => {
-    show('#/p/demo');
-    expect(screen.queryByTestId('planned')).toBeNull();
-    expect(screen.queryByTestId('all-planned')).toBeNull();
+  it('one vocabulary: none of Now, Next, Ready, Held or Planned as a label on any page', () => {
+    for (const hash of ['#/', '#/projects', '#/ideas', '#/built']) {
+      const { container, unmount } = show(hash);
+      container.querySelectorAll('.body').forEach((b) => b.remove()); // spec text is the owner's own words
+      expect(container.textContent).not.toMatch(/\b(Now|Next|Ready|Held|Planned)\b/);
+      for (const el of container.querySelectorAll('[title],[aria-label]'))
+        expect(`${el.getAttribute('title') ?? ''} ${el.getAttribute('aria-label') ?? ''}`).not.toMatch(/\b(Now|Next|Ready|Held|Planned)\b/);
+      unmount();
+    }
   });
 });
 
-describe('search on the board', () => {
+describe('search (BL-14: everything)', () => {
   const all = () => boardItems(data, 'name-asc', null);
   const find = (q: string) => all().filter((i) => matches(i, q));
   it('an ID matches only that ID', () => {
@@ -169,19 +167,18 @@ describe('search on the board', () => {
     expect(find('ot-1').map((h) => h.id)).toEqual(['OT-1']);
   });
   it('text matches titles and full text, every word required', () => {
-    expect(find('thing').map((h) => h.id).sort()).toEqual(['DM-0', 'DM-1', 'DM-2', 'DM-3', 'DM-5']); // I-2 is an idea: not on the board
+    expect(find('thing').map((h) => h.id).sort()).toEqual(['DM-0', 'DM-1', 'DM-2', 'DM-3', 'DM-5']);
     expect(find('colour choice').map((h) => h.id)).toEqual(['DM-2']);
     expect(find('passing').map((h) => h.repo)).toEqual(['other']);
-    expect(find('dark mode')).toEqual([]); // ideas live on the Ideas page only
-    expect(find('orphan')).toEqual([]);
+    expect(boardIdeas(data, 'name-asc').filter((i) => ideaMatches(i, 'dark mode')).map((i) => i.idea.id)).toEqual(['I-1']);
   });
-  it('a query shows the board from any page, Built searched across every day', () => {
+  it('a query shows the home page from any page; Done searched across every day; ideas listed', () => {
     show('#/projects?q=older', new Date(2027, 0, 1));
-    expect(lines('built')).toEqual(['DM-0Older thing (v1.1.0)']);
-    expect(heads()).toEqual(['Now 0', 'Next 0', '▾Built 1 — demo 1']); // open while searching
+    expect(lines('done')).toEqual(['demoDM-0Older thing (v1.1.0)']);
+    expect(heads()).toEqual(['Stuck – needs you 0', 'Will be built next 0', 'Waiting for your OK 0', 'Ideas 0', 'Done 1']);
     cleanup();
-    show('#/?q=stuck');
-    expect(lines('now')).toEqual(['DM-2Stuck thingBlocked']);
+    show('#/ideas?q=orphan');
+    expect(within(lane('ideas')).getAllByTestId('idea').map((i) => i.textContent)).toEqual(['Unassigned U-1 Orphan gadget (2026-11-18)']);
   });
 });
 
@@ -198,7 +195,7 @@ describe('projects page (BL-10 compact cards)', () => {
     expect(within(demo).getByTestId('meta-line').textContent).toBe('v1.3.0 · desktop · pushed 2026-11-17 · built 2026-11-17');
     expect(within(demo).getByRole('link', { name: 'demo.vercel.app' }).getAttribute('href')).toBe('https://demo.vercel.app');
     expect(within(demo).getByRole('link', { name: 'repo' }).getAttribute('href')).toBe('https://github.com/AlexLCBranco/demo');
-    expect(within(demo).getByTestId('counts').textContent).toBe('Planned 3 (Ready 2 / Held 1) · Blocked 1 · Ideas 2');
+    expect(within(demo).getByTestId('counts').textContent).toBe('Stuck 1 · Will be built next 1 · Waiting for your OK 1 · Ideas 2');
     expect(demo.querySelector('dl')).toBeNull();
     expect(demo.textContent).not.toContain('Backlog changed');
     expect(demo.textContent).not.toContain('Suite time');
@@ -249,10 +246,6 @@ describe('ideas page (BL-7)', () => {
     expect(within(demo).getAllByTestId('idea')).toHaveLength(2);
     expect(within(demo).getByRole('button', { name: 'Copy I-1' })).toBeTruthy();
   });
-  it('never shows ideas in Next, Now or Built', () => {
-    show('#/');
-    for (const c of ['next', 'now', 'built']) expect(col(c).textContent).not.toContain('Dark mode toggle');
-  });
   it('an empty Unassigned group says so', () => {
     render(<View data={{ ...data, unassigned: { file: true, ideas: [] } }} route={{ page: 'ideas' }} q="" go={() => {}} />);
     expect(screen.getByTestId('ideas-unassigned').textContent).toContain('No unassigned ideas.');
@@ -261,7 +254,7 @@ describe('ideas page (BL-7)', () => {
 
 describe('tab title', () => {
   it('names what is open', () => {
-    expect(titleOf({ page: 'board' })).toBe('backlogkit · Board');
+    expect(titleOf({ page: 'board' })).toBe('backlogkit · Home');
     expect(titleOf({ page: 'projects' })).toBe('backlogkit · Projects');
     expect(titleOf({ page: 'ideas' })).toBe('backlogkit · Ideas');
     expect(titleOf({ page: 'built' })).toBe('backlogkit · Built');
@@ -305,22 +298,23 @@ describe('one-click moves (BL-11)', () => {
     expect(screen.queryAllByTestId('move')).toEqual([]);
   });
 
-  it('board: "→ Now" on each Next item only, sending a Held → Ready move without opening the row', async () => {
+  it('home: "Give OK" on each Waiting item only, sending a Held → Ready move without opening the row', async () => {
     const { o, moves } = owner();
     showAs(o, '#/');
-    expect(within(col('now')).queryAllByTestId('move')).toEqual([]);
-    const buttons = within(col('next')).getAllByTestId('move');
-    expect(buttons.map((b) => b.textContent)).toEqual(['→ Now', '→ Now']); // DM-3, OT-11
+    expect(within(lane('next')).queryAllByTestId('move')).toEqual([]);
+    expect(within(lane('stuck')).queryAllByTestId('move')).toEqual([]); // OT-11 is blocked: Stuck, no Give OK
+    const buttons = within(lane('waiting')).getAllByTestId('move');
+    expect(buttons.map((b) => b.textContent)).toEqual(['Give OK']); // DM-3
     fireEvent.click(buttons[0]!);
     await waitFor(() => expect(moves).toEqual([{ action: 'ready', repo: 'demo', id: 'DM-3' }]));
     expect(buttons[0]!.closest('details')!.open).toBe(false);
   });
 
-  it('Ideas page: "→ Next" on repo ideas; an unassigned idea needs a repo picked first', async () => {
+  it('Ideas page: "Plan it" on repo ideas; an unassigned idea needs a repo picked first', async () => {
     const { o, moves } = owner();
     showAs(o, '#/ideas');
     const demoIdeas = within(screen.getByTestId('ideas-demo')).getAllByTestId('move');
-    expect(demoIdeas.map((b) => b.textContent)).toEqual(['→ Next', '→ Next']);
+    expect(demoIdeas.map((b) => b.textContent)).toEqual(['Plan it', 'Plan it']);
     fireEvent.click(demoIdeas[1]!);
     await waitFor(() => expect(moves).toEqual([{ action: 'idea', repo: 'demo', id: 'I-2' }]));
 
@@ -336,7 +330,7 @@ describe('one-click moves (BL-11)', () => {
 
   it("shows the server's reason next to the button when a move fails", async () => {
     showAs(owner({ move: async () => 'DM-3 is not under Held (moved already?)' }).o, '#/');
-    fireEvent.click(within(col('next')).getAllByTestId('move')[0]!);
+    fireEvent.click(within(lane('waiting')).getAllByTestId('move')[0]!);
     expect(await screen.findByTestId('move-error')).toHaveProperty('textContent', 'DM-3 is not under Held (moved already?)');
   });
 
