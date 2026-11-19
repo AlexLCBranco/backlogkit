@@ -204,3 +204,21 @@ select.reason { height: 22px; padding: 0 4px; border-radius: 4px; border: 1px so
 .ideas-group-row:hover { text-decoration: none; background: var(--panel-2); }
 .ideas-group-row .group-name { font-weight: 600; }
 .ideas-group-row .first-idea { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Done: what's new since your last visit (BL-18). */
+.strip-done.has { background: #17301f; border-color: #2c5a3e; }
+.strip-done.has b { color: var(--ok); }
+.done-summary { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.done-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.done-row:hover { background: var(--panel-2); }
+.done-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.done-row .caret { width: 10px; color: var(--muted); }
+.done-row .newest { flex: 1; min-width: 0; color: #c9ced8; overflow-wrap: anywhere; }
+ul.done-items { list-style: none; margin: 4px 0 8px 18px; padding: 0; }
+ul.done-items li { padding: 4px 0; }
+.done-title { font-weight: 500; }
+ul.done-items .id { margin-left: 8px; color: var(--muted); }
+.done-detail { font-size: 13px; margin-top: 1px; }
+.all-built { display: flex; align-items: center; gap: 14px; }
+button.mark-seen { padding: 4px 12px; border-radius: 6px; border: 1px solid #2c5a3e; background: #17301f; color: #8fdcb0; font: inherit; font-size: 13px; cursor: pointer; }
+button.mark-seen:hover { color: var(--text); }

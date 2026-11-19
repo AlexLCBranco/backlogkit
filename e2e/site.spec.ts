@@ -55,7 +55,8 @@ test.describe('mocked GitHub', () => {
     expect(await lines(page, 'next')).toEqual(['alpha | Alpha gets a plain sentence. | AL-1', 'alpha | Odd estimate* | AL-2', 'demo | First thing* | DM-1', `zulu | ${LONG}* | ZU-2`]);
     expect(await lines(page, 'waiting')).toEqual(['demo | Later thing* | DM-3']);
     await expect(page.getByTestId('lane-ideas').getByTestId('ideas-row')).toHaveText(['Needs your decision 1 Orphan gadget for no repo', 'No reason yet 2 Dark mode toggle']);
-    expect(await lines(page, 'done')).toEqual(['demo | Newest thing (v1.3.0) | DM-5', 'demo | A fix without ID (v1.2.1)', 'demo | v1.2.0: old style line', 'demo | Older thing (v1.1.0) | DM-0']); // zulu's 11-12 is older than 7 days
+    await expect(page.getByTestId('done-summary')).toHaveText('4 new since you last looked'); // first visit: zulu's 11-12 is older than 7 days
+    await expect(page.getByTestId('strip-done')).toHaveCSS('background-color', 'rgb(23, 48, 31)'); // green while there is something new
 
     // Stuck is red-tinted; its number red above 0.
     await expect(page.getByTestId('lane-stuck')).toHaveCSS('background-color', 'rgb(42, 21, 25)');
@@ -90,7 +91,7 @@ test.describe('mocked GitHub', () => {
     await page.goto('/#/?q=AL-1');
     await expect(page.getByTestId('lane-stuck')).toContainText('Nothing stuck.');
     await expect(page.getByTestId('lane-waiting')).toContainText('Nothing waiting for your OK.');
-    await expect(page.getByTestId('lane-done')).toContainText('Nothing built in the last 7 days.');
+    await expect(page.getByTestId('lane-done')).toContainText('Nothing built matches.');
     await expect(page.getByTestId('lane-stuck').locator('.empty')).toHaveCSS('color', 'rgb(139, 147, 163)'); // muted
     await expect(page.getByTestId('strip-stuck')).toHaveCSS('background-color', 'rgb(42, 45, 53)');
   });
@@ -128,11 +129,30 @@ test.describe('mocked GitHub', () => {
     expect(m.sw).toBeLessThanOrEqual(m.w + 1);
   });
 
-  test('Done: last 7 days grouped by repo, link to everything built', async ({ page }) => {
+  test('Done: new since your last visit, grouped by project; Mark all seen empties it and it stays empty (BL-18)', async ({ page }) => {
     await page.clock.setFixedTime(new Date('2026-11-17T12:00:00')); // 7 days: 11-11 … 11-17, so zulu's 11-12 is in
     await page.goto('/');
-    await expect.poll(() => page.getByTestId('built-group').evaluateAll((els) => els.map((e) => e.getAttribute('data-repo')))).toEqual(['demo', 'zulu']);
-    await page.getByTestId('lane-done').getByRole('link', { name: 'Everything built' }).click();
+    const done = page.getByTestId('lane-done');
+    await expect(done.getByTestId('done-summary')).toHaveText('5 new since you last looked');
+    await expect(done.locator('.done-row')).toHaveText(['▸demo 4 Newest thing (v1.3.0)', '▸zulu 1 Timed thing (v0.2.0)']); // the measured time is not part of the line
+    await expect(done.getByTestId('done-item')).toHaveCount(0);
+    await done.locator('.done-row').first().click();
+    await expect(done.getByTestId('done-item').locator('.done-title')).toHaveText(['Newest thing (v1.3.0)', 'A fix without ID (v1.2.1)', 'v1.2.0: old style line', 'Older thing (v1.1.0)']);
+    await expect(done.getByTestId('done-item').first().locator('.done-detail')).toHaveText('What the owner sees now.');
+    await expect(done).not.toContainText('secret housekeeping'); // ### Internal left out
+    await expect(page.getByTestId('strip-done').locator('b')).toHaveText('5');
+
+    await page.reload(); // a reload marks nothing
+    await expect(done.getByTestId('done-summary')).toHaveText('5 new since you last looked');
+    await done.getByTestId('mark-seen').click();
+    await expect(done.getByTestId('done-summary')).toHaveText('Nothing new · 5 built in the last 7 days');
+    await expect(done.getByTestId('done-group')).toHaveCount(0);
+    await expect(page.getByTestId('strip-done').locator('b')).toHaveText('0');
+    await page.reload();
+    await expect(done.getByTestId('done-summary')).toHaveText('Nothing new · 5 built in the last 7 days');
+    await expect(done.getByTestId('done-group')).toHaveCount(0);
+
+    await done.getByRole('link', { name: 'Everything built' }).click();
     await expect(page).toHaveURL(/#\/built$/);
     await expect(page.getByTestId('all-built-day').last()).toContainText('ZU-1');
   });
@@ -182,8 +202,8 @@ test.describe('mocked GitHub', () => {
     expect(await clipboard()).toBe('### DM-1 — First thing\nLine one of the spec.\n- a bullet\n  continued');
     await expect(row).not.toHaveAttribute('open');
 
-    const built = page.getByTestId('lane-done').getByTestId('board-item').first();
-    await built.locator('summary').hover();
+    await page.getByTestId('lane-done').locator('.done-row').first().click();
+    const built = page.getByTestId('lane-done').getByTestId('done-item').first();
     await built.getByRole('button', { name: 'Copy DM-5' }).click();
     expect(await clipboard()).toBe('- DM-5 — Newest thing (v1.3.0)\n  What the owner sees now.');
   });

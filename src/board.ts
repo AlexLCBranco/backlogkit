@@ -17,7 +17,7 @@ export const LANES: { key: Lane; label: string; empty: string }[] = [
   { key: 'next', label: 'Will be built next', empty: 'Nothing to build next.' },
   { key: 'waiting', label: 'Waiting for your OK', empty: 'Nothing waiting for your OK.' },
   { key: 'ideas', label: 'Ideas', empty: 'No ideas.' },
-  { key: 'done', label: 'Done', empty: 'Nothing built in the last 7 days.' },
+  { key: 'done', label: 'Done', empty: 'Nothing built matches.' }, // shown only while searching (BL-18)
 ];
 /** Idea groups by why they're not planned (BL-17), in page order; "Maybe never" last and folded. */
 export type WhyKey = Why | 'none';
@@ -48,6 +48,8 @@ export interface BoardItem {
   repo: string;
   id: string | null;
   title: string;
+  /** A built item's version ("1.3.0"), null otherwise. */
+  version: string | null;
   /** The spec's "In short" sentence (BL-15); null when it has none, and for built items. */
   short: string | null;
   /** The Blocked note: the question for the owner (BL-16); null when not blocked. */
@@ -90,6 +92,7 @@ const planned = (repo: string, section: 'ready' | 'held', i: PlannedItem, n: num
   repo,
   id: i.id,
   title: i.title,
+  version: null,
   short: i.short ?? null,
   blockedNote: i.blockedNote ?? null,
   body: i.body,
@@ -106,6 +109,7 @@ const built = (repo: string, date: string, i: BuiltItem, n: number): BoardItem =
   repo,
   id: i.id,
   title: i.title,
+  version: i.version ?? null,
   short: null,
   blockedNote: null,
   body: i.detail,
@@ -185,6 +189,56 @@ export function builtGroups(items: BoardItem[]): { repo: string; items: BoardIte
   const by = new Map<string, BoardItem[]>();
   for (const i of items) if (i.lane === 'done') by.set(i.repo, [...(by.get(i.repo) ?? []), i]);
   return [...by].map(([repo, list]) => ({ repo, items: list })).sort((a, b) => b.items.length - a.items.length || a.repo.localeCompare(b.repo));
+}
+
+// Done: what's new since your last visit (BL-18). "Seen" is a list of built-item keys kept in this browser; only
+// "Mark all seen" adds to it (never a reload). A built item is new when it is from the last 30 days and not seen; on
+// the first visit (no list yet) everything from the last 7 days is new.
+export const NEW_DAYS = 30;
+export const SEEN_STORAGE_KEY = 'backlogkit.done.seen';
+
+/** The first day still in the 30 days a built item can be new in. */
+export const newCutoff = (now: Date) => localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (NEW_DAYS - 1)));
+
+/** A built item's key: repo + ID, or repo + title + version for items without an ID. */
+export const doneKey = (i: Pick<BoardItem, 'repo' | 'id' | 'title' | 'version'>) => (i.id ? `${i.repo}#${i.id}` : `${i.repo}#${i.title}#${i.version ?? ''}`);
+
+/** Which built items are new: `seen` null = first visit. Input order kept. */
+export function newDone(items: BoardItem[], seen: string[] | null, now: Date): BoardItem[] {
+  const built = items.filter((i) => i.lane === 'done');
+  if (seen === null) return built.filter((i) => i.date! >= builtCutoff(now));
+  const s = new Set(seen);
+  return built.filter((i) => i.date! >= newCutoff(now) && !s.has(doneKey(i)));
+}
+
+/**
+ * The seen list after "Mark all seen" on `shown`: what was seen (first visit: everything older than 7 days, which
+ * never counted as new) plus `shown`, kept to keys still within the 30 days.
+ */
+export function markSeen(items: BoardItem[], seen: string[] | null, shown: BoardItem[], now: Date): string[] {
+  const recent = items.filter((i) => i.lane === 'done' && i.date! >= newCutoff(now));
+  const base = seen ?? recent.filter((i) => i.date! < builtCutoff(now)).map(doneKey);
+  const keep = new Set(recent.map(doneKey));
+  return [...new Set([...base, ...shown.map(doneKey)])].filter((k) => keep.has(k));
+}
+
+export function loadSeen(): string[] | null {
+  try {
+    const raw = localStorage.getItem(SEEN_STORAGE_KEY);
+    if (raw === null) return null;
+    const v: unknown = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSeen(seen: string[]) {
+  try {
+    localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify(seen));
+  } catch {
+    // storage blocked: seen until the page is reloaded
+  }
 }
 
 export const FILTER_STORAGE_KEY = 'backlogkit.board.projects';

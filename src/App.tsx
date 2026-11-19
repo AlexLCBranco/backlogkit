@@ -16,6 +16,11 @@ import {
   boardItems,
   builtCutoff,
   builtGroups,
+  loadSeen,
+  markSeen,
+  newCutoff,
+  newDone,
+  saveSeen,
   ideaMatches,
   inFilter,
   laneCounts,
@@ -348,7 +353,7 @@ function NumberStrip({ counts }: { counts: Record<Lane, number> }) {
   );
 }
 
-function Lane({ k, count, children, extra }: { k: Lane; count: number; children: ReactNode; extra?: ReactNode }) {
+function Lane({ k, count, children, extra, always }: { k: Lane; count: number; children: ReactNode; extra?: ReactNode; always?: boolean }) {
   const l = LANES.find((x) => x.key === k)!;
   return (
     <section id={laneId(k)} className={`lane lane-${k}${count ? '' : ' is-empty'}`} data-testid={laneId(k)}>
@@ -356,8 +361,33 @@ function Lane({ k, count, children, extra }: { k: Lane; count: number; children:
         {l.label} <span className="muted count">{count}</span>
       </h2>
       {extra}
-      {count ? children : <p className="muted empty">{l.empty}</p>}
+      {count || always ? children : <p className="muted empty">{l.empty}</p>}
     </section>
+  );
+}
+
+/** One project's new built items (BL-18): a row with its count and newest line; a click unfolds the items. */
+function DoneGroup({ repo, items }: { repo: string; items: BoardItem[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="done-group" data-testid="done-group" data-repo={repo}>
+      <button type="button" className="done-row" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
+        <ProjectLabel repo={repo} /> <b>{items.length}</b> <span className="newest">{items[0]!.title}</span>
+      </button>
+      {open && (
+        <ul className="done-items">
+          {items.map((i) => (
+            <li key={i.key} data-testid="done-item">
+              <span className="done-title">{i.title}</span>
+              {i.id && <span className="id">{i.id}</span>}
+              <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
+              {i.body && <div className="muted done-detail">{i.body}</div>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -389,12 +419,21 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
   };
   const valid = selected.filter((s) => projects.some((p) => p.repo === s));
   const searching = !!q.trim();
-  const cutoff = builtCutoff(now ?? new Date());
+  const today = now ?? new Date();
+  const cutoff = newCutoff(today);
   const items = useMemo(() => boardItems(data, sort, searching ? null : cutoff), [data, sort, searching, cutoff]);
+  const [seen, setSeen] = useState<string[] | null>(loadSeen);
   const ideas = useMemo(() => boardIdeas(data, sort), [data, sort]);
   const visible = items.filter((i) => inFilter(i, valid) && matches(i, q));
   const visibleIdeas = ideas.filter((i) => inFilter(i, valid) && ideaMatches(i, q));
-  const counts = laneCounts(visible, visibleIdeas);
+  const fresh = newDone(visible, seen, today);
+  const lastWeek = visible.filter((i) => i.lane === 'done' && i.date! >= builtCutoff(today)).length;
+  const counts = { ...laneCounts(visible, visibleIdeas), ...(searching ? {} : { done: fresh.length }) };
+  const markAll = () => {
+    const next = markSeen(items, seen, fresh, today);
+    saveSeen(next);
+    setSeen(next);
+  };
   const of = (k: Lane) => visible.filter((i) => i.lane === k);
   const groups = builtGroups(visible);
 
@@ -438,18 +477,34 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
               ))
           )}
         </Lane>
-        <Lane k="done" count={counts.done}>
-          {groups.map((g) => (
-            <div key={g.repo} className="repo-group" data-testid="built-group" data-repo={g.repo}>
-              <h3>
-                {g.repo} <span className="muted count">{g.items.length}</span>
+        <Lane k="done" count={counts.done} always={!searching}>
+          {searching ? (
+            groups.map((g) => (
+              <div key={g.repo} className="repo-group" data-testid="built-group" data-repo={g.repo}>
+                <h3>
+                  {g.repo} <span className="muted count">{g.items.length}</span>
+                </h3>
+                {g.items.map((i) => (
+                  <BoardLine key={i.key} item={i} first={false} />
+                ))}
+              </div>
+            ))
+          ) : (
+            <>
+              <h3 className="done-summary" data-testid="done-summary">
+                {fresh.length ? `${fresh.length} new since you last looked` : `Nothing new · ${lastWeek} built in the last 7 days`}
               </h3>
-              {g.items.map((i) => (
-                <BoardLine key={i.key} item={i} first={false} />
+              {builtGroups(fresh).map((g) => (
+                <DoneGroup key={g.repo} repo={g.repo} items={g.items} />
               ))}
-            </div>
-          ))}
+            </>
+          )}
           <p className="all-built">
+            {!searching && fresh.length > 0 && (
+              <button type="button" className="mark-seen" data-testid="mark-seen" onClick={markAll}>
+                Mark all seen
+              </button>
+            )}
             <a href={hrefOf({ page: 'built' })}>Everything built</a>
           </p>
         </Lane>

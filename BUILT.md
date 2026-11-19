@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-19
+- BL-18 — Done: what's new since your last visit (v1.14.0) (took 3 min, suite 0.4 min)
+  The Done box says how many things were built since you last looked, one row per project (click to see each item and what changed); Mark all seen clears it, and the Done number turns green while there is something new.
 - BL-17 — Ideas grouped by why they're not planned (v1.13.0) (took 4 min, suite 0.4 min)
   The Ideas page and the home Ideas box group ideas into Needs your decision, Waiting on something, Too big, Not important yet, No reason yet and Maybe never (folded); dates and notes sit small under each idea, and after unlocking each idea has a reason dropdown.
 - BL-16 — Stuck items: show the question and answer it from the site (v1.12.0) (took 4 min, suite 0.4 min)

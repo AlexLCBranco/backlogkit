@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { OwnerContext, applyMove, type MoveRequest, type Owner } from '../src/owner';
 import { loadAll } from '../lib/github.mjs';
 import { View, parseHash, titleOf, cardTooltip } from '../src/App';
-import { FILTER_STORAGE_KEY, LANES, boardIdeas, boardItems, builtCutoff, builtGroups, ideaMatches, laneCounts, laneOf, matches } from '../src/board';
+import { SEEN_STORAGE_KEY, doneKey, loadSeen, markSeen, newCutoff, newDone, saveSeen, FILTER_STORAGE_KEY, LANES, boardIdeas, boardItems, builtCutoff, builtGroups, ideaMatches, laneCounts, laneOf, matches } from '../src/board';
 import type { Data } from '../src/types';
 import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from './fixtures';
 
@@ -86,7 +86,7 @@ describe('home page: five lanes (BL-14)', () => {
     expect(within(lane('stuck')).getByText('Nothing stuck.').className).toContain('muted');
     expect(within(lane('next')).getByText('Nothing to build next.')).toBeTruthy();
     expect(within(lane('ideas')).getByText('No ideas.')).toBeTruthy();
-    expect(within(lane('done')).getByText('Nothing built in the last 7 days.')).toBeTruthy();
+    expect(within(lane('done')).getByText('Nothing built matches.')).toBeTruthy();
     expect(lane('stuck').classList.contains('is-empty')).toBe(true);
     expect(lane('waiting').classList.contains('is-empty')).toBe(false);
   });
@@ -98,16 +98,66 @@ describe('home page: five lanes (BL-14)', () => {
     const text = screen.getAllByTestId('board-item').map((i) => i.textContent).join('\n');
     expect(text).not.toMatch(/\b[IU]-\d+/);
   });
-  it('Done is the last 7 days, open, grouped by repo, with a link to everything built', () => {
+  it('Done, first visit: the last 7 days are new, one row per project, a click unfolds its items (BL-18)', () => {
     show('#/');
-    expect(screen.getAllByTestId('built-group').map((g) => g.dataset.repo)).toEqual(['demo', 'other']);
-    expect(lines('done')).toEqual(['demo | Newest thing (v1.3.0) | DM-5', 'demo | A fix without ID (v1.2.1)', 'demo | v1.2.0: old style line', 'demo | Older thing (v1.1.0) | DM-0', 'other | Other built (v2.0.0) | OT-1']); // built lines: no tag
+    expect(screen.getByTestId('done-summary').textContent).toBe('5 new since you last looked');
+    const rows = screen.getAllByTestId('done-group');
+    expect(rows.map((g) => g.querySelector('.done-row')!.textContent)).toEqual(['▸demo 4 Newest thing (v1.3.0)', '▸other 1 Other built (v2.0.0)']);
+    expect(screen.queryAllByTestId('done-item')).toEqual([]);
+    fireEvent.click(rows[0]!.querySelector('.done-row')!);
+    const items = within(rows[0]!).getAllByTestId('done-item');
+    expect(items.map((i) => i.querySelector('.done-title')!.textContent)).toEqual(['Newest thing (v1.3.0)', 'A fix without ID (v1.2.1)', 'v1.2.0: old style line', 'Older thing (v1.1.0)']);
+    expect(items[0]!.querySelector('.done-detail')!.textContent).toBe('What the owner sees now.');
+    expect(lane('done').textContent).not.toContain('secret housekeeping'); // ### Internal left out
     expect(within(lane('done')).getByRole('link', { name: 'Everything built' }).getAttribute('href')).toBe('#/built');
-    cleanup();
-    show('#/', new Date(2026, 10, 22, 12)); // 7 days: 2026-11-16 … 2026-11-22
-    expect(lines('done')).toHaveLength(4);
+    expect(screen.getByTestId('strip-done').classList.contains('has')).toBe(true);
     expect(builtCutoff(new Date(2026, 10, 22, 23, 59))).toBe('2026-11-16');
     expect(builtCutoff(new Date(2026, 11, 3))).toBe('2026-11-27');
+  });
+  it('Mark all seen empties the list, stays empty after a reload, and nothing is marked by itself (BL-18)', () => {
+    show('#/');
+    cleanup();
+    show('#/'); // a reload: still new
+    expect(screen.getByTestId('done-summary').textContent).toBe('5 new since you last looked');
+    fireEvent.click(screen.getByTestId('mark-seen'));
+    expect(screen.getByTestId('done-summary').textContent).toBe('Nothing new · 5 built in the last 7 days');
+    expect(screen.queryAllByTestId('done-group')).toEqual([]);
+    expect(screen.queryByTestId('mark-seen')).toBeNull();
+    expect(screen.getByTestId('strip-done').querySelector('b')!.textContent).toBe('0');
+    expect(screen.getByTestId('strip-done').classList.contains('has')).toBe(false);
+    cleanup();
+    show('#/');
+    expect(screen.getByTestId('done-summary').textContent).toBe('Nothing new · 5 built in the last 7 days');
+  });
+  it('new vs seen vs older than 30 days, with fixed dates (BL-18)', () => {
+    const now = new Date(2026, 10, 19, 12);
+    const all = boardItems(data, 'name-asc', null);
+    const keys = (l: { repo: string; id: string | null; title: string; version: string | null }[]) => l.map(doneKey);
+    // First visit: the last 7 days only.
+    expect(keys(newDone(all, null, now))).toEqual(['demo#DM-5', 'demo#A fix without ID (v1.2.1)#1.2.1', 'other#OT-1', 'demo#v1.2.0: old style line#1.2.0', 'demo#DM-0']);
+    // Seen ones drop out; an unseen one within 30 days but older than 7 is new.
+    const later = new Date(2026, 11, 10, 12); // 30 days: 2026-11-11 … 2026-12-10
+    expect(keys(newDone(all, ['demo#DM-5', 'other#OT-1'], later))).toEqual(['demo#A fix without ID (v1.2.1)#1.2.1', 'demo#v1.2.0: old style line#1.2.0', 'demo#DM-0']);
+    // Older than 30 days: never new.
+    expect(newDone(all, [], new Date(2027, 0, 1))).toEqual([]);
+    // Marking on the first visit counts the older ones as seen too; keys older than 30 days are dropped.
+    const marked = markSeen(all, null, newDone(all, null, now), now);
+    expect(newDone(all, marked, now)).toEqual([]);
+    expect(markSeen(all, ['gone#X-1', 'demo#DM-5'], [], now)).toEqual(['demo#DM-5']);
+    expect(newCutoff(now)).toBe('2026-10-21');
+  });
+  it('the seen list survives blocked storage (no crash, nothing remembered)', () => {
+    const real = Storage.prototype.getItem;
+    Storage.prototype.getItem = () => {
+      throw new Error('blocked');
+    };
+    try {
+      expect(loadSeen()).toBeNull();
+      expect(() => saveSeen(['x'])).not.toThrow();
+    } finally {
+      Storage.prototype.getItem = real;
+    }
+    expect(JSON.parse(localStorage.getItem(SEEN_STORAGE_KEY) ?? 'null')).toEqual(['x']);
   });
   it('Done groups: most items first, each repo once, newest first within a repo', () => {
     const g = builtGroups(boardItems(data, 'name-asc', null));
