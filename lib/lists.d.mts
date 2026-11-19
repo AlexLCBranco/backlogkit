@@ -2,7 +2,7 @@ export type SectionKind = 'ready' | 'held' | 'other'
 export interface Duration { min: number; max: number }
 export interface Estimate { raw: string; build: Duration | null; suite: Duration | null; ok: boolean }
 export interface SuiteRecord { raw: string; last: { minutes: number; date: string | null } | null; longest: { minutes: number; date: string | null } | null }
-export interface PlannedItem { id: string | null; title: string; heading: string; body: string; blocked: boolean; estimate: Estimate | null }
+export interface PlannedItem { id: string | null; title: string; heading: string; body: string; blocked: boolean; estimate: Estimate | null; short: string | null }
 export interface Section { name: string; kind: SectionKind; items: PlannedItem[] }
 export interface BuiltItem { id: string | null; title: string; text: string; detail: string; markdown: string; version: string | null; took: Estimate | null }
 export interface BuiltDay { date: string; items: BuiltItem[] }
@@ -12,6 +12,7 @@ export interface Counts { ready: number; held: number; planned: number; blocked:
 export function splitId(text: string): { id: string | null; title: string }
 export function sectionKind(name: string): SectionKind
 export function parseBacklog(text: string): Section[]
+export function parseShort(body: string): string | null
 export function parseBuiltDays(text: string): BuiltDay[]
 export function parseBuilt(text: string): Record<string, string[]>
 export function parseIdeas(text: string): Idea[]

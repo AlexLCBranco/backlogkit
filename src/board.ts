@@ -31,6 +31,8 @@ export interface BoardItem {
   repo: string;
   id: string | null;
   title: string;
+  /** The spec's "In short" sentence (BL-15); null when it has none, and for built items. */
+  short: string | null;
   /** What opens in place: the full spec, or the built item's sentence. */
   body: string;
   blocked: boolean;
@@ -69,6 +71,7 @@ const planned = (repo: string, section: 'ready' | 'held', i: PlannedItem, n: num
   repo,
   id: i.id,
   title: i.title,
+  short: i.short ?? null,
   body: i.body,
   blocked: i.blocked,
   date: null,
@@ -83,6 +86,7 @@ const built = (repo: string, date: string, i: BuiltItem, n: number): BoardItem =
   repo,
   id: i.id,
   title: i.title,
+  short: null,
   body: i.detail,
   blocked: false,
   date,

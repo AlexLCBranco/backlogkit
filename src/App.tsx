@@ -208,15 +208,23 @@ function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
   return (
     <details className={`bitem${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo}>
       <summary>
-        <span className="tag" data-testid="repo-label">{item.repo}</span>
-        {item.id && <span className="id">{item.id}</span>}
-        <span className="title">{item.title}</span>
+        <ProjectLabel repo={item.repo} />
+        <span className="title">
+          {item.short ?? item.title}
+          {!item.short && item.lane !== 'done' && (
+            <span className="badge no-summary" data-testid="no-summary" title="This spec has no “In short” line yet">
+              no summary yet
+            </span>
+          )}
+        </span>
         {item.lane === 'waiting' && item.id && (
           <MoveButton label="Give OK" title={`Give OK to ${item.id}: it moves to “Will be built next” in ${item.repo}`} req={{ action: 'ready', repo: item.repo, id: item.id }} />
         )}
         <CopyButton text={item.markdown} label={label} />
+        {item.id && <span className="id">{item.id}</span>}
       </summary>
       <div className="body">
+        {item.short && <div className="spec-title">{item.title}</div>}
         {item.date && <div className="muted when">{item.date}</div>}
         {(item.estimate || item.took) && (
           <div className="badges">
@@ -419,12 +427,12 @@ function UnassignedMove({ idea, targets }: { idea: Idea; targets: string[] }) {
 }
 
 /** repo: whose IDEAS.md this is (with a FEATURE_BACKLOG.md to move into), or 'unassigned' with the repos to pick from. */
-function IdeaList({ ideas, repo, targets = [] }: { ideas: Idea[]; repo?: string | 'unassigned'; targets?: string[] }) {
+function IdeaList({ ideas, label, repo, targets = [] }: { ideas: Idea[]; label: string | null; repo?: string | 'unassigned'; targets?: string[] }) {
   return (
     <ul className="idea-list">
       {ideas.map((i, n) => (
         <li key={`${i.id ?? ''}-${n}`} data-testid="idea">
-          {i.id && <span className="id">{i.id}</span>} {i.title}
+          <ProjectLabel repo={label} /> {i.id && <span className="id">{i.id}</span>} {i.title}
           <CopyButton text={ideaMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
           {i.id && repo === 'unassigned' && <UnassignedMove idea={i} targets={targets} />}
           {i.id && repo && repo !== 'unassigned' && <MoveButton label="Plan it" title={`Plan ${i.id}: it moves to “Waiting for your OK” in ${repo}`} req={{ action: 'idea', repo, id: i.id }} />}
@@ -448,7 +456,7 @@ export function IdeasPage({ data }: { data: Data }) {
           Unassigned <span className="muted">{un.ideas.length}</span>{' '}
           {un.ideas.length > 0 && <CopyButton text={ideasMarkdown(un.ideas)} label="Copy all Unassigned ideas" />}
         </h3>
-        {un.ideas.length ? <IdeaList ideas={un.ideas} repo="unassigned" targets={targets} /> : <p className="muted">{un.file ? 'No unassigned ideas.' : 'No UNASSIGNED_IDEAS.md.'}</p>}
+        {un.ideas.length ? <IdeaList ideas={un.ideas} label={null} repo="unassigned" targets={targets} /> : <p className="muted">{un.file ? 'No unassigned ideas.' : 'No UNASSIGNED_IDEAS.md.'}</p>}
       </section>
       {withIdeas.map((p) => (
         <section key={p.repo} className="repo-block" data-testid={`ideas-${p.repo}`}>
@@ -456,7 +464,7 @@ export function IdeasPage({ data }: { data: Data }) {
             <a href={hrefOf({ page: 'board', only: p.repo })}>{p.repo}</a> <span className="muted">{p.ideas.length}</span>{' '}
             <CopyButton text={ideasMarkdown(p.ideas)} label={`Copy all ${p.repo} ideas`} />
           </h3>
-          <IdeaList ideas={p.ideas} repo={p.files.backlog ? p.repo : undefined} />
+          <IdeaList ideas={p.ideas} label={p.repo} repo={p.files.backlog ? p.repo : undefined} />
         </section>
       ))}
     </div>

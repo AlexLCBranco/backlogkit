@@ -8,20 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-### BL-15 — Cards anyone can read: plain sentence first, project name instead of a dot
-**In short:** Each item shows one plain sentence first, with the project's name written on it instead of a coloured dot.
-**What:**
-- The shared parser (`lib/lists.mjs`) reads `**In short:** ...` when it is the first non-empty line under an item's
-  heading (format: CLAUDE.md, "backlogkit formats") into `item.short`; missing → `null`.
-- Card row: project name label, then the In short sentence (full, wrapping), then the ID small and muted at the right.
-  Without an In short line the heading title shows instead, followed by a small muted "no summary yet" tag so old specs
-  are easy to spot. Clicking a card still unfolds the full spec underneath.
-- Project label: the repo's name as text in a neutral chip, the same on every page (home, Ideas, Done, Built). Remove the
-  coloured dots: their colours repeat today (backlogkit and calendarkit look the same, so do footykit and gauntlet).
-**Tests:** parser unit (with In short, without, In short not the first line → `null`); e2e: a card shows the sentence and
-the project name as text, a card without In short shows its title and "no summary yet", no dot element remains.
-**Estimate:** build ~20–30 min · suite ~0.5 min
-
 ### BL-16 — Stuck items: show the question and answer it from the site
 **In short:** Stuck items show exactly what's needed from you, and you can type your answer right there.
 **What:**

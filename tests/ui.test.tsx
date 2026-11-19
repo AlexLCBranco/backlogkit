@@ -13,7 +13,7 @@ let data: Data;
 beforeAll(async () => {
   const { fetchImpl } = mockGithub({
     repos: [{ name: 'demo' }, { name: 'other' }, { name: 'broken', private: true }, { name: 'bare' }],
-    files: { demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS }, other: { 'FEATURE_BACKLOG.md': '## Ready\n\n### OT-10 — Other ten\nmentions DM-1 in passing\n\n## Held\n\n### OT-11 — Other held\nBlocked: needs a key.\n', 'BUILT.md': '## 2026-11-17\n- OT-1 — Other built (v2.0.0)\n', 'IDEAS.md': '# Ideas\n\nNone yet.\n' }, backlogkit: { 'UNASSIGNED_IDEAS.md': '# Unassigned\n\n- U-1 — Orphan gadget (2026-11-18)\n' } },
+    files: { demo: { 'FEATURE_BACKLOG.md': BACKLOG, 'BUILT.md': BUILT, 'IDEAS.md': IDEAS }, other: { 'FEATURE_BACKLOG.md': '## Ready\n\n### OT-10 — Other ten\n**In short:** Other gets ten.\nmentions DM-1 in passing\n\n## Held\n\n### OT-11 — Other held\nBlocked: needs a key.\n', 'BUILT.md': '## 2026-11-17\n- OT-1 — Other built (v2.0.0)\n', 'IDEAS.md': '# Ideas\n\nNone yet.\n' }, backlogkit: { 'UNASSIGNED_IDEAS.md': '# Unassigned\n\n- U-1 — Orphan gadget (2026-11-18)\n' } },
     fails: { broken: 403 },
     projectsJson: projectsJson([
       { repo: 'demo', description: 'Demo app', url: 'https://demo.vercel.app', status: 'active', devices: ['desktop'] },
@@ -32,7 +32,13 @@ const show = (hash: string, now = NOW) => {
   return render(<View data={data} route={route} q={q} go={() => {}} now={now} />);
 };
 const lane = (key: string) => screen.getByTestId(`lane-${key}`);
-const lines = (key: string) => within(lane(key)).queryAllByTestId('board-item').map((i) => i.querySelector('summary')!.textContent);
+// A row as "label | sentence | ID"; a sentence ending in * has the "no summary yet" tag (BL-15).
+const row = (s: Element) => {
+  const title = s.querySelector('.title')!;
+  const text = (title.firstChild!.textContent ?? '') + (title.querySelector('.no-summary') ? '*' : '');
+  return [s.querySelector('.tag')!.textContent, text, s.querySelector('.id')?.textContent].filter(Boolean).join(' | ');
+};
+const lines = (key: string) => within(lane(key)).queryAllByTestId('board-item').map((i) => row(i.querySelector('summary')!));
 const heads = () => screen.getAllByTestId(/^lane-/).map((c) => c.querySelector('h2')!.textContent);
 const strip = () => LANES.map((l) => screen.getByTestId(`strip-${l.key}`).querySelector('b')!.textContent);
 const ALL_HEADS = ['Stuck – needs you 2', 'Will be built next 2', 'Waiting for your OK 1', 'Ideas 3', 'Done 5'];
@@ -55,9 +61,9 @@ describe('home page: five lanes (BL-14)', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(laneCounts(items, boardIdeas(data, 'name-asc'))).toEqual({ stuck: 2, next: 2, waiting: 1, ideas: 3, done: 5 });
     show('#/');
-    expect(lines('stuck')).toEqual(['demoDM-2Stuck thing', 'otherOT-11Other held']);
-    expect(lines('next')).toEqual(['demoDM-1First thing', 'otherOT-10Other ten']);
-    expect(lines('waiting')).toEqual(['demoDM-3Later thing']);
+    expect(lines('stuck')).toEqual(['demo | Stuck thing* | DM-2', 'other | Other held* | OT-11']);
+    expect(lines('next')).toEqual(['demo | First thing* | DM-1', 'other | Other gets ten. | OT-10']);
+    expect(lines('waiting')).toEqual(['demo | Later thing* | DM-3']);
   });
   it('the Stuck number is red above 0 and grey at 0', () => {
     show('#/');
@@ -93,7 +99,7 @@ describe('home page: five lanes (BL-14)', () => {
   it('Done is the last 7 days, open, grouped by repo, with a link to everything built', () => {
     show('#/');
     expect(screen.getAllByTestId('built-group').map((g) => g.dataset.repo)).toEqual(['demo', 'other']);
-    expect(lines('done')).toEqual(['demoDM-5Newest thing (v1.3.0)', 'demoA fix without ID (v1.2.1)', 'demov1.2.0: old style line', 'demoDM-0Older thing (v1.1.0)', 'otherOT-1Other built (v2.0.0)']);
+    expect(lines('done')).toEqual(['demo | Newest thing (v1.3.0) | DM-5', 'demo | A fix without ID (v1.2.1)', 'demo | v1.2.0: old style line', 'demo | Older thing (v1.1.0) | DM-0', 'other | Other built (v2.0.0) | OT-1']); // built lines: no tag
     expect(within(lane('done')).getByRole('link', { name: 'Everything built' }).getAttribute('href')).toBe('#/built');
     cleanup();
     show('#/', new Date(2026, 10, 22, 12)); // 7 days: 2026-11-16 … 2026-11-22
@@ -144,7 +150,7 @@ describe('home page: five lanes (BL-14)', () => {
     expect(parseHash('#/all').route).toEqual({ page: 'board' });
     show('#/p/OTHER');
     expect(screen.getByRole('button', { name: 'other' }).getAttribute('aria-pressed')).toBe('true');
-    expect(lines('next')).toEqual(['otherOT-10Other ten']);
+    expect(lines('next')).toEqual(['other | Other gets ten. | OT-10']);
     expect(JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY)!)).toEqual(['other']);
   });
   it('one vocabulary: none of Now, Next, Ready, Held or Planned as a label on any page', () => {
@@ -154,6 +160,36 @@ describe('home page: five lanes (BL-14)', () => {
       expect(container.textContent).not.toMatch(/\b(Now|Next|Ready|Held|Planned)\b/);
       for (const el of container.querySelectorAll('[title],[aria-label]'))
         expect(`${el.getAttribute('title') ?? ''} ${el.getAttribute('aria-label') ?? ''}`).not.toMatch(/\b(Now|Next|Ready|Held|Planned)\b/);
+      unmount();
+    }
+  });
+});
+
+describe('cards anyone can read (BL-15)', () => {
+  it('a card shows the project name as text, the In short sentence, the ID at the right; the title opens with the spec', () => {
+    show('#/');
+    const item = within(lane('next')).getAllByTestId('board-item')[1] as HTMLDetailsElement;
+    const s = item.querySelector('summary')!;
+    expect(s.firstElementChild!.textContent).toBe('other');
+    expect(s.lastElementChild!.textContent).toBe('OT-10');
+    expect(s.querySelector('.title')!.textContent).toBe('Other gets ten.');
+    expect(within(item).queryByTestId('no-summary')).toBeNull();
+    fireEvent.click(s);
+    expect(item.querySelector('.spec-title')!.textContent).toBe('Other ten');
+  });
+  it('a card without In short shows its title and "no summary yet"', () => {
+    show('#/');
+    const s = within(lane('next')).getAllByTestId('board-item')[0]!.querySelector('summary')!;
+    expect(s.querySelector('.title')!.textContent).toBe('First thingno summary yet');
+    expect(within(s as HTMLElement).getByTestId('no-summary')).toBeTruthy();
+  });
+  it('no coloured dot anywhere; the same project label on home, Ideas and Everything built', () => {
+    for (const hash of ['#/', '#/ideas', '#/built']) {
+      const { container, unmount } = show(hash);
+      expect(container.querySelector('.dot, [data-testid="repo-dot"]')).toBeNull();
+      const labels = [...container.querySelectorAll('[data-testid="repo-label"]')];
+      expect(labels.length).toBeGreaterThan(0);
+      for (const l of labels) expect(l.className).toMatch(/^tag( tag-unassigned)?$/);
       unmount();
     }
   });
@@ -174,7 +210,7 @@ describe('search (BL-14: everything)', () => {
   });
   it('a query shows the home page from any page; Done searched across every day; ideas listed', () => {
     show('#/projects?q=older', new Date(2027, 0, 1));
-    expect(lines('done')).toEqual(['demoDM-0Older thing (v1.1.0)']);
+    expect(lines('done')).toEqual(['demo | Older thing (v1.1.0) | DM-0']);
     expect(heads()).toEqual(['Stuck – needs you 0', 'Will be built next 0', 'Waiting for your OK 0', 'Ideas 0', 'Done 1']);
     cleanup();
     show('#/ideas?q=orphan');
@@ -240,7 +276,7 @@ describe('ideas page (BL-7)', () => {
     show('#/ideas');
     const blocks = screen.getAllByTestId(/^ideas-/).map((b) => b.dataset.testid);
     expect(blocks).toEqual(['ideas-unassigned', 'ideas-demo']); // other has an IDEAS.md with no items
-    expect(within(screen.getByTestId('ideas-unassigned')).getAllByTestId('idea').map((i) => i.textContent)).toEqual(['U-1 Orphan gadget (2026-11-18)']);
+    expect(within(screen.getByTestId('ideas-unassigned')).getAllByTestId('idea').map((i) => i.textContent)).toEqual(['Unassigned U-1 Orphan gadget (2026-11-18)']);
     const demo = screen.getByTestId('ideas-demo');
     expect(within(demo).getByRole('link', { name: 'demo' }).getAttribute('href')).toBe('#/p/demo');
     expect(within(demo).getAllByTestId('idea')).toHaveLength(2);

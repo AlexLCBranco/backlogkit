@@ -12,7 +12,15 @@ const pkgVersion = (JSON.parse(readFileSync('package.json', 'utf8')) as { versio
 
 // The fixture's built days are 2026-11-12 … 2026-11-17; the board's clock is fixed so "last 7 days" stays stable.
 const TODAY = new Date('2026-11-19T12:00:00');
-const lines = (page: Page, lane: string) => page.getByTestId(`lane-${lane}`).getByTestId('board-item').locator('summary').allTextContents();
+// A row as "label | sentence | ID"; a sentence ending in * has the "no summary yet" tag (BL-15).
+const lines = (page: Page, lane: string) =>
+  page.getByTestId(`lane-${lane}`).getByTestId('board-item').locator('summary').evaluateAll((els) =>
+    els.map((s) => {
+      const title = s.querySelector('.title')!;
+      const text = (title.firstChild!.textContent ?? '') + (title.querySelector('.no-summary') ? '*' : '');
+      return [s.querySelector('.tag')!.textContent, text, s.querySelector('.id')?.textContent].filter(Boolean).join(' | ');
+    }),
+  );
 const heads = (page: Page) => page.locator('[data-testid^="lane-"] > h2').allTextContents();
 const stripNumbers = (page: Page) => page.getByTestId('strip').locator('b').allTextContents();
 const LANE_KEYS = ['stuck', 'next', 'waiting', 'ideas', 'done'];
@@ -43,11 +51,11 @@ test.describe('mocked GitHub', () => {
     const strip = (await page.getByTestId('strip').boundingBox())!;
     expect(strip.y).toBeLessThan(boxes[0]!.y); // at the very top
 
-    expect(await lines(page, 'stuck')).toEqual(['demoDM-2Stuck thing']);
-    expect(await lines(page, 'next')).toEqual(['alphaAL-1Alpha item', 'alphaAL-2Odd estimate', 'demoDM-1First thing', `zuluZU-2${LONG}`]);
-    expect(await lines(page, 'waiting')).toEqual(['demoDM-3Later thing']);
+    expect(await lines(page, 'stuck')).toEqual(['demo | Stuck thing* | DM-2']);
+    expect(await lines(page, 'next')).toEqual(['alpha | Alpha gets a plain sentence. | AL-1', 'alpha | Odd estimate* | AL-2', 'demo | First thing* | DM-1', `zulu | ${LONG}* | ZU-2`]);
+    expect(await lines(page, 'waiting')).toEqual(['demo | Later thing* | DM-3']);
     await expect(page.getByTestId('lane-ideas').getByRole('link', { name: '3 ideas' })).toHaveAttribute('href', '#/ideas');
-    expect(await lines(page, 'done')).toEqual(['demoDM-5Newest thing (v1.3.0)', 'demoA fix without ID (v1.2.1)', 'demov1.2.0: old style line', 'demoDM-0Older thing (v1.1.0)']); // zulu's 11-12 is older than 7 days
+    expect(await lines(page, 'done')).toEqual(['demo | Newest thing (v1.3.0) | DM-5', 'demo | A fix without ID (v1.2.1)', 'demo | v1.2.0: old style line', 'demo | Older thing (v1.1.0) | DM-0']); // zulu's 11-12 is older than 7 days
 
     // Stuck is red-tinted; its number red above 0.
     await expect(page.getByTestId('lane-stuck')).toHaveCSS('background-color', 'rgb(42, 21, 25)');
@@ -87,11 +95,32 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('strip-stuck')).toHaveCSS('background-color', 'rgb(42, 45, 53)');
   });
 
+  test('cards: project name as text, plain sentence first, ID at the right, no dots (BL-15)', async ({ page }) => {
+    await page.goto('/');
+    const card = page.getByTestId('lane-next').getByTestId('board-item').first();
+    await expect(card).toBeVisible();
+    const parts = await card.locator('summary > *').evaluateAll((els) => els.filter((e) => getComputedStyle(e).visibility !== 'hidden').map((e) => ({ cls: e.className, text: e.textContent, x: e.getBoundingClientRect().x })));
+    expect(parts[0]).toMatchObject({ cls: 'tag', text: 'alpha' });
+    expect(parts[1]).toMatchObject({ cls: 'title', text: 'Alpha gets a plain sentence.' });
+    expect(parts.at(-1)).toMatchObject({ cls: 'id', text: 'AL-1' });
+    expect(parts.at(-1)!.x).toBeGreaterThan(page.viewportSize()!.width - 150); // at the right edge
+    const plain = page.getByTestId('lane-next').getByTestId('board-item').nth(2);
+    await expect(plain.locator('summary .title')).toHaveText('First thingno summary yet');
+    await expect(plain.getByTestId('no-summary')).toBeVisible();
+    await card.locator('summary').click();
+    await expect(card.locator('.spec-title')).toHaveText('Alpha item');
+    for (const hash of ['/', '/#/ideas', '/#/built']) {
+      await page.goto(hash);
+      await expect(page.getByTestId('repo-label').first()).toBeVisible();
+      await expect(page.locator('.dot, [data-testid="repo-dot"]')).toHaveCount(0);
+    }
+  });
+
   test('a long title wraps instead of being cut off with "…" (BL-12)', async ({ page }) => {
     await page.setViewportSize({ width: 700, height: 800 });
     await page.goto('/');
     const title = page.getByTestId('lane-next').getByTestId('board-item').last().locator('summary .title');
-    await expect(title).toHaveText(LONG);
+    await expect(title).toHaveText(`${LONG}no summary yet`);
     const m = await title.evaluate((e) => ({ overflow: getComputedStyle(e).textOverflow, lh: parseFloat(getComputedStyle(e).lineHeight), h: e.clientHeight, sh: e.scrollHeight, sw: e.scrollWidth, w: e.clientWidth }));
     expect(m.overflow).not.toBe('ellipsis');
     expect(m.h).toBeGreaterThan(m.lh * 1.5); // on two lines
@@ -329,7 +358,7 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('lane-next').getByTestId('move')).toHaveCount(0);
     const waiting = page.getByTestId('lane-waiting');
     await waiting.getByRole('button', { name: 'Give OK' }).click();
-    await expect.poll(() => lines(page, 'next')).toContain('demoDM-3Later thing');
+    await expect.poll(() => lines(page, 'next')).toContain('demo | Later thing* | DM-3');
     expect(await lines(page, 'waiting')).toEqual([]);
     await expect(waiting).toContainText('Nothing waiting for your OK.');
 
@@ -340,7 +369,7 @@ test.describe('mocked GitHub', () => {
     await expect(demoIdeas.getByTestId('idea')).toHaveCount(1);
     await expect(demoIdeas).not.toContainText('Dark mode toggle');
     await page.goto('/');
-    await expect.poll(() => lines(page, 'waiting')).toEqual(['demoDM-6Dark mode toggleGive OK']);
+    await expect.poll(() => lines(page, 'waiting')).toEqual(['demo | Dark mode toggle* | DM-6']);
     expect(sent).toEqual([{ action: 'ready', repo: 'demo', id: 'DM-3' }, { action: 'idea', repo: 'demo', id: 'I-1' }]);
 
     // Lock: buttons gone, and gone after a reload too.

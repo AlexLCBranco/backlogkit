@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { builtSummary, counts, ideaMarkdown, parseBacklog, parseBuilt, parseBuiltDays, parseIdeas, parseUnassignedIdeas } from '../lib/lists.mjs';
+import { builtSummary, counts, ideaMarkdown, parseBacklog, parseBuilt, parseBuiltDays, parseIdeas, parseShort, parseUnassignedIdeas } from '../lib/lists.mjs';
 import { BACKLOG, BUILT, IDEAS } from './fixtures';
 
 describe('parseBacklog', () => {
@@ -80,5 +80,19 @@ describe('parseUnassignedIdeas (BL-7)', () => {
   it('ideaMarkdown gives the line back', () => {
     expect(ideaMarkdown({ id: 'U-1', title: 'One (2026-11-18)' })).toBe('- U-1 — One (2026-11-18)');
     expect(ideaMarkdown({ id: null, title: 'No id' })).toBe('- No id');
+  });
+});
+
+describe('In short (BL-15)', () => {
+  it('reads the first non-empty line under the heading into item.short', () => {
+    const [ready] = parseBacklog('## Ready\n\n### X-1 — Title one\n\n**In short:** You see a new button.\nMore text.\n\n### X-2 — Title two\nText first.\n**In short:** Too late.\n\n### X-3 — Title three\n');
+    expect(ready!.items.map((i) => i.short)).toEqual(['You see a new button.', null, null]);
+  });
+  it('parseShort: with, without, not first, empty', () => {
+    expect(parseShort('**In short:** A sentence.  \r\nrest')).toBe('A sentence.');
+    expect(parseShort('No summary here.')).toBeNull();
+    expect(parseShort('Intro\n**In short:** later')).toBeNull();
+    expect(parseShort('**In short:**   ')).toBeNull();
+    expect(parseShort('')).toBeNull();
   });
 });
