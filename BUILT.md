@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-19
+- Fix: a selection cleared right after a drag could come back (v1.15.1)
+  Clicking empty space (or Esc) just after drawing a selection box now always clears it.
 - BL-13 — Marquee selection on the board (v1.15.0) (took 3 min, suite 0.4 min)
   Drag a box over items on the home page to select them (Shift or Ctrl adds more); a bar shows how many are selected with Copy (or Ctrl+C) and Clear, and Esc clears.
 - BL-18 — Done: what's new since your last visit (v1.14.0) (took 3 min, suite 0.4 min)

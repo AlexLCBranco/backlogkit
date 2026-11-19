@@ -39,6 +39,9 @@ Tests: 154 unit + 22 e2e, all passing; full local suite ~0.4 min (26 s).
 
 **Internal**: CI's live check failed on the BL-14 push (it waited for exactly v1.10.0 while the BL-16 push had already
 deployed v1.12.0). It now accepts this version or a newer one (`scripts/wait-live.ts`, with a test).
+CI then caught a real BL-13 bug the local runs had missed (about 1 run in 4): right after a drag, a click that cleared
+the selection could be undone a moment later by an update still queued from the drag. Fixed in v1.15.1 with a test
+that failed on the old code.
 
 **Blocked**: none. **Ideas added**: none.
 

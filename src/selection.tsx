@@ -138,7 +138,11 @@ export function useMarqueeSelection(store: SelectionStore, box: RefObject<HTMLDi
       boxEl!.style.display = 'none';
     }
     function handlePointerUp() {
-      if (drawing) update(); // the last position counts
+      // The last position counts, now; a frame still queued from the drag must not run after this (it would bring
+      // the selection back after a click that cleared it).
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      if (drawing) update();
       finish();
       if (drawing && pressedItem) {
         // the click that ends a drag started on an item must not open it (only that click)

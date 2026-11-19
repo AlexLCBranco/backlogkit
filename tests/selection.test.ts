@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // BL-13: marquee selection — hit-testing the box against item rects, adding with a modifier, clearing, copy format.
 import { describe, expect, it, vi } from 'vitest';
-import { createSelectionStore, itemsTouching, nextSelection, selectionText, touches } from '../src/selection';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+import { createSelectionStore, itemsTouching, nextSelection, selectionText, touches, useMarqueeSelection } from '../src/selection';
 
 const rect = (left: number, top: number, width: number, height: number) => ({ left, top, right: left + width, bottom: top + height, width, height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
 
@@ -65,5 +66,33 @@ describe('copy format', () => {
         { repo: 'demo', markdown: '- DM-5 — Built (v1.3.0)\n  What changed.' },
       ]),
     ).toBe('## demo\n\n### DM-1 — First\nSpec.\n\n- DM-5 — Built (v1.3.0)\n  What changed.\n\n## other\n\n### OT-1 — Other\n');
+  });
+});
+
+describe('the drag itself', () => {
+  it('a clear right after a drag stays cleared (no frame queued during the drag runs after the mouse is up)', () => {
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb));
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+      frames[id - 1] = () => {};
+    });
+    const area = page([['a', rect(10, 10, 500, 30)]]);
+    Object.assign(area, { setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture: () => false });
+    const empty = document.createElement('p');
+    area.append(empty);
+    document.body.append(area);
+    const store = createSelectionStore();
+    const onDown = useMarqueeSelection(store, { current: document.createElement('div') });
+    const ev = (type: string, x: number, y: number) => Object.assign(new Event(type), { clientX: x, clientY: y });
+    onDown({ currentTarget: area, target: empty, button: 0, isPrimary: true, pointerType: 'mouse', clientX: 0, clientY: 0, pointerId: 1, shiftKey: false, ctrlKey: false, metaKey: false } as unknown as ReactPointerEvent<HTMLElement>);
+    area.dispatchEvent(ev('pointermove', 100, 30)); // a frame is queued
+    area.dispatchEvent(ev('pointerup', 100, 30)); // the last position counts at once
+    expect([...store.get()]).toEqual(['a']);
+    store.clear(); // e.g. a click on empty space straight away
+    frames.splice(0).forEach((cb) => cb(0)); // the next frame
+    expect(store.get().size).toBe(0);
+    raf.mockRestore();
+    vi.restoreAllMocks();
+    area.remove();
   });
 });
