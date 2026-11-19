@@ -27,19 +27,18 @@ every title is cut off while a quarter of the screen width sits empty, and ideas
   section headers already carry the counts), and "Estimated: — (no estimates yet)" when a section has no estimates.
 - **Filter chips:** the selected chips must be obvious at a glance (filled background, not just a thin border).
 - Empty sections show one short muted line ("Nothing here"), not an empty box.
-- Conflict with BL-11 (held): its "→" on ideas (Later → Next) can no longer live on the board. When BL-11 is built,
-  that move belongs on the Ideas page; on the board it only moves Next → Now.
 - Tests: automated checks that no idea (`I-n`) appears on the board, that the sections are in the order Now, Next, Built,
   that Built is collapsed by default and expands on click, that a long title is not truncated with "…", and that the
   repo dot is hidden when one repo is filtered.
 
 ## Held (needs the owner's "go"; never built from "build the backlog")
 
-### BL-11 — One-click move between columns on the board
-On each board item, a small "→" button moves it one column right (Later → Next → Now), written straight to that repo's
-files on GitHub: an idea is cut from `IDEAS.md`/`UNASSIGNED_IDEAS.md` and added at the bottom of `## Held` with the next
-free ID of that repo and a `From I-n` line; a Next item moves from `## Held` to the bottom of `## Ready`. Never moves
-anything into Built.
+### BL-11 — One-click moves: idea → Next (Ideas page), Next → Now (board)
+Two small "→" buttons, each written straight to that repo's files on GitHub:
+- **Ideas page:** on each idea, "→ Next" cuts it from `IDEAS.md`/`UNASSIGNED_IDEAS.md` and adds it at the bottom of
+  `## Held` with the next free ID of that repo and a `From I-n` line. (Ideas are not on the board since BL-12.)
+- **Board:** on each Next item, "→ Now" moves it from `## Held` to the bottom of `## Ready`.
+Never moves anything into Built.
 Held because the site is read-only today: this needs a GitHub token with write access to all the owner's repos stored in
 Vercel, and the page must be protected so only the owner can click it. The owner decides the token and the protection before "go".
 **Estimate:** build ~45–90 min · suite ~1 min
