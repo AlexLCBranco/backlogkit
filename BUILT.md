@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-19
+- BL-13 — Marquee selection on the board (v1.15.0) (took 3 min, suite 0.4 min)
+  Drag a box over items on the home page to select them (Shift or Ctrl adds more); a bar shows how many are selected with Copy (or Ctrl+C) and Clear, and Esc clears.
 - BL-18 — Done: what's new since your last visit (v1.14.0) (took 3 min, suite 0.4 min)
   The Done box says how many things were built since you last looked, one row per project (click to see each item and what changed); Mark all seen clears it, and the Done number turns green while there is something new.
 - BL-17 — Ideas grouped by why they're not planned (v1.13.0) (took 4 min, suite 0.4 min)

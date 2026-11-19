@@ -222,3 +222,12 @@ ul.done-items .id { margin-left: 8px; color: var(--muted); }
 .all-built { display: flex; align-items: center; gap: 14px; }
 button.mark-seen { padding: 4px 12px; border-radius: 6px; border: 1px solid #2c5a3e; background: #17301f; color: #8fdcb0; font: inherit; font-size: 13px; cursor: pointer; }
 button.mark-seen:hover { color: var(--text); }
+
+/* Marquee selection (BL-13): the box while dragging and the floating bar. */
+.marquee { position: fixed; left: 0; top: 0; z-index: 30; display: none; border: 1px solid var(--accent); background: rgba(122, 162, 255, 0.12); border-radius: 2px; pointer-events: none; will-change: transform, width, height; }
+.selbar { position: fixed; left: 50%; bottom: 20px; z-index: 35; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 14px; background: var(--panel-2); border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); white-space: nowrap; }
+.selbar-count { font-weight: 600; }
+.selbar button { height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+.selbar button:hover, .selbar button:focus-visible { border-color: var(--muted); }
+.selbar button[data-copied] { color: var(--ok); border-color: #2c5a3e; }
+.board-page { min-height: calc(100vh - 120px); }

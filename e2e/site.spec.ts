@@ -467,6 +467,73 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('strip-stuck').locator('b')).toHaveText('0');
   });
 
+  test('marquee: drag selects the items it touches, Shift adds, Copy and Ctrl+C copy, Esc and empty clicks clear (BL-13)', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const clipboard = async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+    await page.goto('/');
+    const next = page.getByTestId('lane-next');
+    const rows = next.getByTestId('board-item');
+    await expect(rows).toHaveCount(4);
+    const lane = (await next.boundingBox())!;
+    const third = (await rows.nth(2).boundingBox())!;
+    const drag = async (from: { x: number; y: number }, to: { x: number; y: number }, mod?: 'Shift' | 'Control') => {
+      if (mod) await page.keyboard.down(mod);
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 4 });
+      await page.mouse.move(to.x, to.y, { steps: 4 });
+      await page.mouse.up();
+      if (mod) await page.keyboard.up(mod);
+    };
+    const selected = () => page.locator('[data-select-key]').evaluateAll((els) => els.filter((e) => getComputedStyle(e).outlineStyle === 'solid').map((e) => e.closest('[data-repo]')?.getAttribute('data-repo') + ':' + (e.querySelector('.id')?.textContent ?? '')));
+
+    // From the lane's empty top-left corner down to the third row: AL-1, AL-2, DM-1.
+    await drag({ x: lane.x + 4, y: lane.y + 4 }, { x: lane.x + 300, y: third.y + third.height / 2 });
+    await expect(page.getByTestId('selection-count')).toHaveText('3 selected');
+    expect(await selected()).toEqual(['alpha:AL-1', 'alpha:AL-2', 'demo:DM-1']);
+    await expect(rows.nth(0)).not.toHaveAttribute('open'); // selecting opens nothing
+    const want =
+      '## alpha\n\n### AL-1 — Alpha item\n**In short:** Alpha gets a plain sentence.\nText.\n**Estimate:** build ~5 min · suite ~1 min\n\n### AL-2 — Odd estimate\n**Estimate:** soon-ish\n\n' +
+      '## demo\n\n### DM-1 — First thing\nLine one of the spec.\n- a bullet\n  continued\n';
+    await page.getByTestId('copy-selection').click();
+    await expect(page.getByTestId('copy-selection')).toHaveText('Copied');
+    expect(await clipboard()).toBe(want);
+    await page.evaluate(() => navigator.clipboard.writeText(''));
+    await page.keyboard.press('Control+c');
+    await expect.poll(clipboard).toBe(want);
+
+    // Shift + drag over the Waiting lane adds DM-3; the copy keeps page order, grouped by project.
+    const waiting = (await page.getByTestId('lane-waiting').boundingBox())!;
+    await drag({ x: waiting.x + 4, y: waiting.y + 4 }, { x: waiting.x + 300, y: waiting.y + waiting.height - 4 }, 'Shift');
+    await expect(page.getByTestId('selection-count')).toHaveText('4 selected');
+    await page.getByTestId('copy-selection').click();
+    await expect.poll(clipboard).toBe(want.replace('continued\n', 'continued\n\n### DM-3 — Later thing\nHeld text.\n'));
+
+    // Esc clears.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('selection-bar')).toHaveCount(0);
+
+    // A plain click on an item still opens it and selects nothing.
+    await rows.nth(2).locator('summary').click();
+    await expect(rows.nth(2)).toHaveAttribute('open', '');
+    await expect(page.getByTestId('selection-bar')).toHaveCount(0);
+    await rows.nth(2).locator('summary').click();
+
+    // A drag that starts on an item selects without opening it; a click on empty space clears.
+    const first = (await rows.nth(0).boundingBox())!;
+    await drag({ x: first.x + 200, y: first.y + first.height / 2 }, { x: first.x + 220, y: third.y + 4 });
+    await expect(page.getByTestId('selection-count')).toHaveText('3 selected');
+    await expect(rows.nth(0)).not.toHaveAttribute('open');
+    await page.mouse.click(lane.x + 4, lane.y + 4);
+    await expect(page.getByTestId('selection-bar')).toHaveCount(0);
+
+    // Chips and the number strip never start a marquee.
+    const chip = (await page.getByRole('button', { name: 'All projects' }).boundingBox())!;
+    await drag({ x: chip.x + 5, y: chip.y + 5 }, { x: lane.x + 300, y: third.y + 4 });
+    await expect(page.getByTestId('selection-bar')).toHaveCount(0);
+    await expect(page.getByTestId('marquee')).toBeHidden();
+  });
+
   test('the token never reaches the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('lane-next')).toBeVisible();

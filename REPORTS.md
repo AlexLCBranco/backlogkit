@@ -2,6 +2,45 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-19 — BL-14, BL-15, BL-16, BL-17, BL-18, BL-13
+
+**Built** (each its own commit and version, live after each push)
+- BL-14 — Home page as five lanes (v1.10.0): Stuck – needs you (red), Will be built next, Waiting for your OK, Ideas,
+  Done, always in that order, with five big clickable numbers on top. Buttons are now **Give OK** and **Plan it**;
+  Now/Next/Ready/Held/Planned are gone from the screen (an e2e scan checks every page). Chips are 34 px with
+  **All projects** first; the search box says "Search everything…".
+- BL-15 — Cards anyone can read (v1.11.0): project name, then the `**In short:**` sentence, ID small at the right;
+  specs without one show their title and "no summary yet". No coloured dots anywhere.
+- BL-16 — Answer stuck items (v1.12.0): the Blocked question shows in red with its date; after unlocking, **Answer**
+  → Save commits `**Answered (date):** <question> → <answer>` (`backlogkit: answer <ID>`) and the item leaves Stuck.
+- BL-17 — Ideas by reason (v1.13.0): six groups (Maybe never last, folded), notes like dates shown small under the
+  idea, a reason dropdown for the owner (`backlogkit: reason <ID> <why>`), one row per group on Home linking to it.
+  Unknown `[why: …]` values show under "No reason yet" and in the site's warnings.
+- BL-18 — Done: new since your last visit (v1.14.0): "N new since you last looked", one row per project (click to
+  unfold), **Mark all seen**, green Done number while something is new. First visit = last 7 days.
+- BL-13 — Marquee selection (v1.15.0): drag a box to select items; Shift/Ctrl adds; Esc or a click on empty space
+  clears; "N selected · Copy · Clear"; Copy/Ctrl+C copies the items' Markdown grouped by project under `## <repo>`.
+
+Tests: 154 unit + 22 e2e, all passing; full local suite ~0.4 min (26 s).
+
+**Decided without the spec saying** (say if you want any changed)
+- The top-bar link and tab title say "Home" instead of "Board".
+- Stuck items have no Give OK (they need an answer first); "Unlock as owner to answer" shows only when moves are set
+  up on the server.
+- Unassigned ideas count in the Ideas lane only under All projects. While searching, the Ideas lane lists the matching
+  ideas and Done lists matching built items from every day.
+- Answers are put on one line, at most 2000 characters, dated with the server's (UTC) date.
+- Planning a tagged idea drops its `[why: …]` tag. Empty reason groups show "None." with 0. The per-repo "Copy all"
+  buttons on the Ideas page are gone (each idea keeps its copy button).
+- The Done number shows the new count (grey 0 when nothing is new). Mark all seen marks what is shown, so with a
+  project filter on, only that project's items.
+- A marquee can also start on an item line (as in calendarkit); a plain click on an item opens it and keeps the
+  selection.
+
+**Blocked**: none. **Ideas added**: none.
+
+**Test by hand**: nothing required. Only feel: try a marquee drag and the Answer box on the live site.
+
 ## 2026-11-19 — BL-11
 
 **Built**

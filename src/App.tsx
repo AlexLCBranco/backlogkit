@@ -2,7 +2,8 @@
 // BL-10), Ideas, and Everything built; search from the top bar shows Home filtered. Routes live in the hash:
 // #/ (home), #/projects, #/ideas, #/built, plus ?q=<search>. Old #/p/<repo> URLs open Home filtered to that repo; old
 // #/all opens Home.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { SelectionBar, SelectionStyle, createSelectionStore, selectionText, useMarqueeSelection } from './selection';
 import type { Data, Estimate, Idea, Project } from './types';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
@@ -292,7 +293,7 @@ function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
 function ItemDetails({ item, first }: { item: BoardItem; first: boolean }) {
   const label = `Copy ${item.id ?? item.title}`;
   return (
-    <details className={`bitem${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo}>
+    <details className={`bitem${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo} data-select-key={item.key}>
       <summary>
         <ProjectLabel repo={item.repo} />
         <span className="title">
@@ -335,7 +336,7 @@ const laneId = (k: Lane) => `lane-${k}`;
 /** Five big numbers, one per lane; a click scrolls to that lane. */
 function NumberStrip({ counts }: { counts: Record<Lane, number> }) {
   return (
-    <nav className="strip" aria-label="Lanes" data-testid="strip">
+    <nav className="strip" aria-label="Lanes" data-testid="strip" data-no-marquee>
       {LANES.map((l) => (
         <button
           key={l.key}
@@ -378,7 +379,7 @@ function DoneGroup({ repo, items }: { repo: string; items: BoardItem[] }) {
       {open && (
         <ul className="done-items">
           {items.map((i) => (
-            <li key={i.key} data-testid="done-item">
+            <li key={i.key} data-testid="done-item" data-select-key={i.key}>
               <span className="done-title">{i.title}</span>
               {i.id && <span className="id">{i.id}</span>}
               <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
@@ -429,6 +430,15 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
   const fresh = newDone(visible, seen, today);
   const lastWeek = visible.filter((i) => i.lane === 'done' && i.date! >= builtCutoff(today)).length;
   const counts = { ...laneCounts(visible, visibleIdeas), ...(searching ? {} : { done: fresh.length }) };
+  // Marquee selection (BL-13): the selected items' Markdown in page order, grouped by project.
+  const selection = useMemo(createSelectionStore, []);
+  const marquee = useRef<HTMLDivElement>(null);
+  const onMarquee = useMarqueeSelection(selection, marquee);
+  const byKey = new Map(visible.map((i) => [i.key, i]));
+  const copyText = (keys: ReadonlySet<string>) => {
+    const order = [...document.querySelectorAll<HTMLElement>('[data-select-key]')].map((e) => e.dataset.selectKey!);
+    return selectionText(order.filter((k) => keys.has(k)).flatMap((k) => (byKey.has(k) ? [byKey.get(k)!] : [])));
+  };
   const markAll = () => {
     const next = markSeen(items, seen, fresh, today);
     saveSeen(next);
@@ -438,9 +448,12 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
   const groups = builtGroups(visible);
 
   return (
-    <div className="board-page">
+    <div className="board-page" onPointerDown={onMarquee}>
+      <div ref={marquee} className="marquee" aria-hidden="true" data-testid="marquee" />
+      <SelectionStyle store={selection} />
+      <SelectionBar store={selection} text={copyText} />
       <NumberStrip counts={counts} />
-      <div className="chips" role="group" aria-label="Filter by project">
+      <div className="chips" role="group" aria-label="Filter by project" data-no-marquee>
         <button type="button" className="chip" aria-pressed={!valid.length} onClick={() => choose([])}>
           All projects
         </button>
