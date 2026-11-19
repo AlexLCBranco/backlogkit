@@ -9,6 +9,8 @@ Suite time: last ~0.3 min (2026-11-19) · longest ~0.5 min (2026-11-18)
   The home page is now one board of every repo's ideas, held, ready and last-7-days built items, one line each (click to open), with Blocked badges, counts, project filter chips and an All built page; the project page and All repos view are gone.
 - BL-10 — Compact project cards (v1.7.0)
   Each card's details are one line (version · devices · pushed · built, then live site and repo links); suite time and estimates are in the card's tooltip.
+### Internal
+- Logo e2e test waits for the image to load instead of reading it once (it failed on the live site when the logo loaded slowly)
 
 ## 2026-11-18
 - BL-8 — Time estimates: build time and local test suite time (v1.6.0) (took 4 min, suite 0.5 min)

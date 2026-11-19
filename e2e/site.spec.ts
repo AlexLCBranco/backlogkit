@@ -234,10 +234,13 @@ test('version in the bottom-right corner, and /version.json', async ({ page, req
 
 test('logo: header and favicon load (BL-5)', async ({ page, request }) => {
   await page.route('**/api/projects', async (r) => (live ? r.continue() : r.fulfill({ json: await fixtureData() })));
+  // Locally the logo is served slowly, as the live site sometimes is: the image is visible (it has a size) before it
+  // has loaded, so the check has to wait for the load rather than read it once.
+  if (!live) await page.route('**/logo.svg', async (r) => { await new Promise((ok) => setTimeout(ok, 800)); await r.continue(); });
   await page.goto('/');
   const logo = page.getByTestId('logo');
   await expect(logo).toBeVisible();
-  expect(await logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   const href = await page.locator('link[rel="icon"]').getAttribute('href');
   expect(href).toBe('/logo.svg');
   const res = await request.get(href!);

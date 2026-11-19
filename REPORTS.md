@@ -21,6 +21,10 @@ Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backl
 **Decided without the spec saying**: project cards still show "Planned N (Ready / Held) · Blocked N"; Unassigned ideas
 have no chip (shown under All only); BL-11's estimate line is a guess.
 
+**CI**: two runs failed installing Playwright (Ubuntu package mirror timed out on GitHub's runner), fixed by a re-run;
+the live job then failed the logo test, a race (it read the image once, before a slow load); it now waits, and the
+local run serves the logo slowly so the old check fails there.
+
 **Blocked**: none. **Ideas added**: none. **Test by hand**: nothing.
 
 ## 2026-11-18 — BL-5, BL-6, BL-7, BL-8
