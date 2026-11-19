@@ -1,17 +1,36 @@
-// The site: Projects (home, one card each), a project's page (Planned | Built, Ideas folded), All repos, and search
-// from the top bar on every page. Routes live in the hash: #/, #/p/<repo>, #/all, #/ideas, plus ?q=<search>.
+// The site: the Board (home: Later → Next → Now → Built across all repos, BL-9), Projects (one compact card each,
+// BL-10), Ideas, and the full Built list; search from the top bar filters the board. Routes live in the hash:
+// #/ (board), #/projects, #/ideas, #/built, plus ?q=<search>. Old #/p/<repo> URLs open the board filtered to that
+// repo; old #/all opens the board.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Data, Idea, Project, Section, BuiltDay } from './types';
-import { search, type Hit } from './search';
+import type { Data, Estimate, Idea, Project } from './types';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
 import { SORT_OPTIONS, loadSort, saveSort, sortProjects, type SortKey } from './sort';
-import { backlogMarkdown, estimateTotal, formatDuration, ideaMarkdown, itemMarkdown } from '../lib/lists.mjs';
-import type { Estimate, PlannedItem } from './types';
+import { estimateTotal, formatDuration, ideaMarkdown } from '../lib/lists.mjs';
+import {
+  BUILT_DAYS,
+  COLUMNS,
+  UNASSIGNED,
+  boardItems,
+  builtCutoff,
+  inFilter,
+  loadFilter,
+  matches,
+  saveFilter,
+  summarize,
+  summaryLine,
+  type BoardItem,
+} from './board';
+
+/** A field nobody filled in shows as a dash, never a guess. */
+const DASH = '—';
+const dash = (v: ReactNode | null | undefined) => (v === null || v === undefined || v === '' ? DASH : v);
+const day = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
 
 // Time estimates (BL-8): a guess on planned items, the measured time on built ones, measured suite times per repo.
-const suiteText = (p: Project) => {
+export const suiteText = (p: Project) => {
   const s = p.suite;
   if (!s || (!s.last && !s.longest)) return null;
   const one = (x: { minutes: number } | null) => (x ? formatDuration({ min: x.minutes, max: x.minutes })!.replace('~', '') : DASH);
@@ -39,52 +58,45 @@ function TookBadge({ t }: { t: Estimate | null }) {
   );
 }
 
-export function EstimateTotal({ items, label = 'Estimated' }: { items: PlannedItem[]; label?: string }) {
-  if (!items.length) return null;
+/** "build ~5 min · suite ~1 min (1 of 2 items estimated)", or "— (no estimates yet)". */
+export function estimateText(items: { estimate: Estimate | null }[]): string {
   const t = estimateTotal(items);
+  return t.estimated ? `build ${formatDuration(t.build)} · suite ${formatDuration(t.suite)} (${t.estimated} of ${t.total} items estimated)` : `${DASH} (no estimates yet)`;
+}
+
+export function EstimateTotal({ items, label = 'Estimated' }: { items: { estimate: Estimate | null }[]; label?: string }) {
+  if (!items.length) return null;
   return (
     <p className="muted estimate-total" data-testid="estimate-total">
-      {label}:{' '}
-      {t.estimated ? (
-        <>
-          build <b>{formatDuration(t.build)}</b> · suite <b>{formatDuration(t.suite)}</b> <span>({t.estimated} of {t.total} items estimated)</span>
-        </>
-      ) : (
-        <>{DASH} <span>(no estimates yet)</span></>
-      )}
+      {label}: {estimateText(items)}
     </p>
   );
 }
-const plannedItems = (sections: Section[]) => sections.flatMap((s) => s.items);
 
-export type Route = { page: 'home' } | { page: 'project'; repo: string } | { page: 'all' } | { page: 'ideas' };
+export type Route = { page: 'board'; only?: string } | { page: 'projects' } | { page: 'ideas' } | { page: 'built' };
 
 export function parseHash(hash: string): { route: Route; q: string } {
   const [path = '', query = ''] = hash.replace(/^#/, '').split('?');
   const q = new URLSearchParams(query).get('q') ?? '';
   const parts = path.split('/').filter(Boolean);
-  if (parts[0] === 'p' && parts[1]) return { route: { page: 'project', repo: decodeURIComponent(parts[1]) }, q };
-  if (parts[0] === 'all') return { route: { page: 'all' }, q };
+  if (parts[0] === 'p' && parts[1]) return { route: { page: 'board', only: decodeURIComponent(parts[1]) }, q }; // old project page
+  if (parts[0] === 'projects') return { route: { page: 'projects' }, q };
   if (parts[0] === 'ideas') return { route: { page: 'ideas' }, q };
-  return { route: { page: 'home' }, q };
+  if (parts[0] === 'built') return { route: { page: 'built' }, q };
+  return { route: { page: 'board' }, q }; // also the old #/all
 }
 
-/** The browser tab's title for what's open (BL-6): "backlogkit · calendarkit backlog". */
+/** The browser tab's title for what's open (BL-6). */
 export function titleOf(route: Route, q = ''): string {
   if (q.trim()) return `backlogkit · search “${q.trim()}”`;
-  if (route.page === 'project') return `backlogkit · ${route.repo} backlog`;
-  if (route.page === 'all') return 'backlogkit · All repos';
+  if (route.page === 'projects') return 'backlogkit · Projects';
   if (route.page === 'ideas') return 'backlogkit · Ideas';
-  return 'backlogkit · Projects';
+  if (route.page === 'built') return 'backlogkit · Built';
+  return 'backlogkit · Board';
 }
 
 export const hrefOf = (route: Route) =>
-  route.page === 'project' ? `#/p/${encodeURIComponent(route.repo)}` : route.page === 'all' ? '#/all' : route.page === 'ideas' ? '#/ideas' : '#/';
-
-/** A field nobody filled in shows as a dash, never a guess. */
-const DASH = '—';
-const dash = (v: ReactNode | null | undefined) => (v === null || v === undefined || v === '' ? DASH : v);
-const day = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
+  route.page === 'board' ? (route.only ? `#/p/${encodeURIComponent(route.only)}` : '#/') : `#/${route.page}`;
 
 const STATUS_GROUPS: { key: string; label: string; test: (p: Project) => boolean }[] = [
   { key: 'active', label: 'Active', test: (p) => !p.noFiles && p.status === 'active' },
@@ -103,40 +115,34 @@ function ExtLink({ href, children }: { href: string | null; children: ReactNode 
   );
 }
 
+/** The card's tooltip (BL-10): suite times and the planned items' estimate total. */
+export function cardTooltip(p: Project): string {
+  const planned = p.planned.filter((s) => s.kind !== 'other').flatMap((s) => s.items);
+  return `Suite time: ${suiteText(p) ?? DASH}\nEstimated: ${planned.length ? estimateText(planned) : DASH}`;
+}
+
 export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
   const c = p.counts;
   return (
-    <article className={`card${onOpen ? ' clickable' : ''}`} data-testid={`card-${p.repo}`} onClick={onOpen}>
+    <article className={`card${onOpen ? ' clickable' : ''}`} data-testid={`card-${p.repo}`} onClick={onOpen} title={cardTooltip(p)}>
       <header>
-        <h3>{onOpen ? <a href={hrefOf({ page: 'project', repo: p.repo })} onClick={(e) => e.stopPropagation()}>{p.repo}</a> : p.repo}</h3>
+        <h3>{onOpen ? <a href={hrefOf({ page: 'board', only: p.repo })} onClick={(e) => e.stopPropagation()}>{p.repo}</a> : p.repo}</h3>
         <span className={`status status-${p.status ?? 'none'}`}>{dash(p.status)}</span>
       </header>
       <p className="desc">{dash(p.description)}</p>
       {p.warning && <p className="warning" role="alert">⚠ {p.warning}</p>}
       {p.error && <p className="error" role="alert">✕ {p.error}</p>}
-      <dl>
-        <dt>Live site</dt>
-        <dd><ExtLink href={p.url}>{p.url?.replace(/^https?:\/\//, '')}</ExtLink></dd>
-        <dt>Repo</dt>
-        <dd>
-          <ExtLink href={p.github?.url ?? null}>{p.repo}</ExtLink>
-          {p.github && <span className="muted"> · {p.github.private ? 'private' : 'public'}{p.github.archived ? ' · archived' : ''}</span>}
-        </dd>
-        <dt>Devices</dt>
-        <dd>{dash(p.devices?.join(', '))}</dd>
-        <dt>Last push</dt>
-        <dd>{dash(day(p.github?.pushedAt ?? null))}</dd>
-        <dt>Backlog changed</dt>
-        <dd data-testid="backlog-changed">{dash(day(p.backlogChangedAt))}</dd>
-        <dt>Version</dt>
-        <dd>{dash(p.latestVersion && `v${p.latestVersion}`)}</dd>
-        <dt>Last built</dt>
-        <dd>{dash(p.latestBuiltDate)}</dd>
-        <dt>Suite time</dt>
-        <dd data-testid="suite-time" title={p.suite ? `Measured full local test suite: ${p.suite.raw}` : 'No "Suite time:" line in BUILT.md'}>
-          {dash(suiteText(p))}
-        </dd>
-      </dl>
+      <p className="meta" data-testid="meta">
+        <span data-testid="meta-line">
+          <span className="nw">{dash(p.latestVersion && `v${p.latestVersion}`)}</span> · <span className="nw">{dash(p.devices?.join(', '))}</span> ·{' '}
+          <span className="nw">pushed {dash(day(p.github?.pushedAt ?? null))}</span> · <span className="nw">built {dash(p.latestBuiltDate)}</span>
+        </span>{' '}
+        · <span data-testid="live-link"><ExtLink href={p.url}>{p.url?.replace(/^https?:\/\//, '')}</ExtLink></span> ·{' '}
+        <span data-testid="repo-link"><ExtLink href={p.github?.url ?? null}>repo</ExtLink></span>
+        {p.github && (p.github.private || p.github.archived) && (
+          <span className="muted"> ({[p.github.private && 'private', p.github.archived && 'archived'].filter(Boolean).join(', ')})</span>
+        )}
+      </p>
       <p className="counts" data-testid="counts">
         {p.error ? (
           DASH
@@ -151,7 +157,7 @@ export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
   );
 }
 
-export function Home({ data, go }: { data: Data; go: (r: Route) => void }) {
+export function ProjectsPage({ data, go }: { data: Data; go: (r: Route) => void }) {
   const [sort, setSort] = useState<SortKey>(loadSort);
   return (
     <div className="home">
@@ -183,7 +189,7 @@ export function Home({ data, go }: { data: Data; go: (r: Route) => void }) {
             </h2>
             <div className="cards">
               {list.map((p) => (
-                <Card key={p.repo} p={p} onOpen={() => go({ page: 'project', repo: p.repo })} />
+                <Card key={p.repo} p={p} onOpen={() => go({ page: 'board', only: p.repo })} />
               ))}
             </div>
           </section>
@@ -193,141 +199,134 @@ export function Home({ data, go }: { data: Data; go: (r: Route) => void }) {
   );
 }
 
-function PlannedList({ sections, empty }: { sections: Section[]; empty: string }) {
-  if (!sections.some((s) => s.items.length)) return <p className="muted">{empty}</p>;
+function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
+  const label = `Copy ${item.id ?? item.title}`;
   return (
-    <>
-      {sections.map((s) => (
-        <div key={s.name} className="section">
-          <h4>{s.name}</h4>
-          {s.items.length === 0 && <p className="muted">{DASH}</p>}
-          {s.items.map((i, n) => (
-            <details key={`${i.id ?? ''}-${n}`} className={`item${i.blocked ? ' is-blocked' : ''}`} data-testid="planned-item">
-              <summary>
-                {i.id && <span className="id">{i.id}</span>} {i.title}
-                <CopyButton text={itemMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
-                {i.blocked && <span className="badge blocked">Blocked</span>}
-                <EstimateBadge e={i.estimate} />
-              </summary>
-              <div className="body">{i.body || DASH}</div>
-            </details>
-          ))}
-        </div>
-      ))}
-    </>
-  );
-}
-
-function BuiltList({ days, empty }: { days: BuiltDay[]; empty: string }) {
-  if (!days.length) return <p className="muted">{empty}</p>;
-  return (
-    <>
-      {days.map((d) => (
-        <div key={d.date} className="section" data-testid="built-day">
-          <h4>{d.date}</h4>
-          <ul className="built">
-            {d.items.map((i, n) => (
-              <li key={n}>
-                {i.id && <span className="id">{i.id}</span>} {i.title}
-                <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
-                <TookBadge t={i.took} />
-                {i.detail && <div className="muted detail">{i.detail}</div>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </>
-  );
-}
-
-export function ProjectPage({ p }: { p: Project }) {
-  return (
-    <div className="project">
-      <Card p={p} />
-      <div className="columns">
-        <section data-testid="planned">
-          <h2>
-            Planned {backlogMarkdown(p.planned) && <CopyButton text={backlogMarkdown(p.planned)} label="Copy whole backlog" />}
-          </h2>
-          <EstimateTotal items={plannedItems(p.planned)} />
-          <PlannedList sections={p.planned} empty={p.files.backlog ? 'Nothing planned.' : 'No FEATURE_BACKLOG.md.'} />
-        </section>
-        <section data-testid="built">
-          <h2>Built</h2>
-          <BuiltList days={p.built} empty={p.files.built ? 'Nothing built yet.' : 'No BUILT.md.'} />
-        </section>
-      </div>
-      <details className="ideas" data-testid="ideas">
-        <summary>
-          <h2>Ideas</h2> <span className="muted">{p.ideas.length}</span>
-        </summary>
-        {p.ideas.length ? (
-          <ul>
-            {p.ideas.map((i, n) => (
-              <li key={n}>
-                {i.id && <span className="id">{i.id}</span>} {i.title}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">{p.files.ideas ? 'No ideas.' : 'No IDEAS.md.'}</p>
+    <details className={`bitem${item.blocked ? ' is-blocked' : ''}${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo}>
+      <summary>
+        <span className={`tag${item.repo === UNASSIGNED ? ' tag-unassigned' : ''}`}>{item.repo}</span>
+        {item.id && <span className="id">{item.id}</span>}
+        <span className="title">{item.title}</span>
+        {item.blocked && <span className="badge blocked">Blocked</span>}
+        <CopyButton text={item.markdown} label={label} />
+      </summary>
+      <div className="body">
+        {item.date && <div className="muted when">{item.date}</div>}
+        {(item.estimate || item.took) && (
+          <div className="badges">
+            <EstimateBadge e={item.estimate} />
+            <TookBadge t={item.took} />
+          </div>
         )}
-      </details>
+        {item.body || item.title}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * The home board (BL-9). `only` (from an old project URL or a project card) selects that one project; otherwise the
+ * chips this browser remembers. While searching, Built looks through every day, not just the last 7.
+ */
+export function Board({ data, q, only, now }: { data: Data; q: string; only?: string; now?: Date }) {
+  const sort = loadSort();
+  const projects = useMemo(() => sortProjects(data.projects.filter((p) => !p.noFiles), sort), [data, sort]);
+  const resolve = (name: string) => projects.find((p) => p.repo.toLowerCase() === name.toLowerCase())?.repo;
+  const [selected, setSelected] = useState<string[]>(() => {
+    const one = only && resolve(only);
+    return one ? [one] : loadFilter();
+  });
+  useEffect(() => {
+    const one = only && resolve(only);
+    if (one) {
+      setSelected([one]);
+      saveFilter([one]);
+    }
+  }, [only, projects]); // eslint-disable-line react-hooks/exhaustive-deps
+  const choose = (next: string[]) => {
+    setSelected(next);
+    saveFilter(next);
+  };
+  const valid = selected.filter((s) => projects.some((p) => p.repo === s));
+  const searching = !!q.trim();
+  const cutoff = builtCutoff(now ?? new Date());
+  const items = useMemo(() => boardItems(data, sort, searching ? null : cutoff), [data, sort, searching, cutoff]);
+  const visible = items.filter((i) => inFilter(i, valid) && matches(i, q));
+  const summary = summarize(visible);
+  const builtLabel = searching ? 'Built' : `Built (${BUILT_DAYS} days)`;
+
+  return (
+    <div className="board-page">
+      <div className="chips" role="group" aria-label="Filter by project">
+        <button type="button" className="chip" aria-pressed={!valid.length} onClick={() => choose([])}>
+          All
+        </button>
+        {projects.map((p) => {
+          const on = valid.includes(p.repo);
+          return (
+            <button key={p.repo} type="button" className="chip" aria-pressed={on} onClick={() => choose(on ? valid.filter((x) => x !== p.repo) : [...valid, p.repo])}>
+              {p.repo}
+            </button>
+          );
+        })}
+      </div>
+      <p className="board-summary" data-testid="board-summary">
+        {summaryLine(summary, builtLabel)}
+        {searching && <span className="muted"> · matching “{q.trim()}”</span>}
+      </p>
+      <div className="board">
+        {COLUMNS.map((c) => {
+          const list = visible.filter((i) => i.column === c.key);
+          return (
+            <section key={c.key} className={`col col-${c.key}`} data-testid={`col-${c.key}`}>
+              <h2>
+                {c.key === 'built' ? builtLabel : c.label} <span className="muted count">{list.length}</span>
+              </h2>
+              {(c.key === 'now' || c.key === 'next') && <EstimateTotal items={list} />}
+              {!list.length && <p className="muted empty">{DASH}</p>}
+              {list.map((i, n) => (
+                <BoardLine key={i.key} item={i} first={n > 0 && list[n - 1]!.repo !== i.repo} />
+              ))}
+              {c.key === 'built' && (
+                <p className="all-built">
+                  <a href={hrefOf({ page: 'built' })}>All built</a>
+                </p>
+              )}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-export function AllRepos({ data }: { data: Data }) {
-  const withPlans = data.projects.filter((p) => p.planned.some((s) => s.items.length));
-  const byDay = new Map<string, { repo: string; items: BuiltDay['items'] }[]>();
-  for (const p of data.projects) for (const d of p.built) byDay.set(d.date, [...(byDay.get(d.date) ?? []), { repo: p.repo, items: d.items }]);
-  const days = [...byDay.keys()].sort().reverse();
+/** Every repo's built items, by day, newest first (the board's "All built" link). */
+export function BuiltPage({ data }: { data: Data }) {
+  const sort = loadSort();
+  const items = boardItems(data, sort, null).filter((i) => i.column === 'built');
+  const days = [...new Set(items.map((i) => i.date!))];
   return (
-    <div className="columns all">
-      <section data-testid="all-planned">
-        <h2>Planned, by repo</h2>
-        <EstimateTotal items={withPlans.flatMap((p) => plannedItems(p.planned))} label="Estimated, all repos" />
-        {!withPlans.length && <p className="muted">Nothing planned anywhere.</p>}
-        {withPlans.map((p) => (
-          <div key={p.repo} className="repo-block">
-            <h3>
-              <a href={hrefOf({ page: 'project', repo: p.repo })}>{p.repo}</a>{' '}
-              <CopyButton text={backlogMarkdown(p.planned)} label={`Copy whole ${p.repo} backlog`} />
-            </h3>
-            <EstimateTotal items={plannedItems(p.planned)} />
-            <PlannedList sections={p.planned.filter((s) => s.items.length)} empty="" />
-          </div>
-        ))}
-      </section>
-      <section data-testid="all-built">
-        <h2>Built, by day</h2>
-        {!days.length && <p className="muted">Nothing built anywhere.</p>}
-        {days.map((date) => (
-          <div key={date} className="section" data-testid="all-built-day">
-            <h4>{date}</h4>
-            {byDay
-              .get(date)!
-              .sort((a, b) => a.repo.localeCompare(b.repo))
-              .map((r) => (
-                <div key={r.repo} className="repo-day">
-                  <a className="repo-name" href={hrefOf({ page: 'project', repo: r.repo })}>{r.repo}</a>
-                  <ul className="built">
-                    {r.items.map((i, n) => (
-                      <li key={n}>
-                        {i.id && <span className="id">{i.id}</span>} {i.title}
-                        <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
-                <TookBadge t={i.took} />
-                        {i.detail && <div className="muted detail">{i.detail}</div>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+    <section className="built-page" data-testid="all-built">
+      <h2>All built</h2>
+      {!days.length && <p className="muted">Nothing built anywhere.</p>}
+      {days.map((date) => (
+        <div key={date} className="section" data-testid="all-built-day">
+          <h4>{date}</h4>
+          <ul className="built">
+            {items
+              .filter((i) => i.date === date)
+              .map((i) => (
+                <li key={i.key}>
+                  <span className="tag">{i.repo}</span> {i.id && <span className="id">{i.id}</span>} {i.title}
+                  <CopyButton text={i.markdown} label={`Copy ${i.id ?? i.title}`} />
+                  <TookBadge t={i.took} />
+                  {i.body && <div className="muted detail">{i.body}</div>}
+                </li>
               ))}
-          </div>
-        ))}
-      </section>
-    </div>
+          </ul>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -362,39 +361,11 @@ export function IdeasPage({ data }: { data: Data }) {
       {withIdeas.map((p) => (
         <section key={p.repo} className="repo-block" data-testid={`ideas-${p.repo}`}>
           <h3>
-            <a href={hrefOf({ page: 'project', repo: p.repo })}>{p.repo}</a> <span className="muted">{p.ideas.length}</span>{' '}
+            <a href={hrefOf({ page: 'board', only: p.repo })}>{p.repo}</a> <span className="muted">{p.ideas.length}</span>{' '}
             <CopyButton text={ideasMarkdown(p.ideas)} label={`Copy all ${p.repo} ideas`} />
           </h3>
           <IdeaList ideas={p.ideas} />
         </section>
-      ))}
-    </div>
-  );
-}
-
-const KIND_LABEL: Record<Hit['kind'], string> = { planned: 'Planned', built: 'Built', idea: 'Idea' };
-
-export function SearchResults({ data, q }: { data: Data; q: string }) {
-  const hits = useMemo(() => search(data.projects, q, data.unassigned?.ideas), [data, q]);
-  return (
-    <div className="search-results" data-testid="search-results">
-      <h2>
-        {hits.length} {hits.length === 1 ? 'match' : 'matches'} for “{q.trim()}”
-      </h2>
-      {hits.map((h, n) => (
-        <details key={n} className="item hit" data-testid="hit">
-          <summary>
-            {h.repo === null ? (
-              <a href={hrefOf({ page: 'ideas' })} className="repo-name">Unassigned</a>
-            ) : (
-              <a href={hrefOf({ page: 'project', repo: h.repo })} className="repo-name">{h.repo}</a>
-            )}
-            <span className={`badge kind-${h.kind}`}>{KIND_LABEL[h.kind]}</span>
-            <span className="muted">{h.where}</span> {h.id && <span className="id">{h.id}</span>} {h.title}
-            {h.blocked && <span className="badge blocked">Blocked</span>}
-          </summary>
-          {h.text && <div className="body">{h.text}</div>}
-        </details>
       ))}
     </div>
   );
@@ -415,16 +386,14 @@ export function Notices({ data }: { data: Data }) {
   );
 }
 
-/** Everything below the top bar, for a given state (no fetching; tests render this directly). */
-export function View({ data, route, q, go }: { data: Data; route: Route; q: string; go: (r: Route) => void }) {
-  if (q.trim()) return <SearchResults data={data} q={q} />;
-  if (route.page === 'all') return <AllRepos data={data} />;
-  if (route.page === 'ideas') return <IdeasPage data={data} />;
-  if (route.page === 'project') {
-    const p = data.projects.find((x) => x.repo.toLowerCase() === route.repo.toLowerCase());
-    return p ? <ProjectPage p={p} /> : <p className="warning">No project “{route.repo}”.</p>;
+/** Everything below the top bar, for a given state (no fetching; tests render this directly). A query shows the board. */
+export function View({ data, route, q, go, now }: { data: Data; route: Route; q: string; go: (r: Route) => void; now?: Date }) {
+  if (!q.trim()) {
+    if (route.page === 'projects') return <ProjectsPage data={data} go={go} />;
+    if (route.page === 'ideas') return <IdeasPage data={data} />;
+    if (route.page === 'built') return <BuiltPage data={data} />;
   }
-  return <Home data={data} go={go} />;
+  return <Board data={data} q={q} only={route.page === 'board' ? route.only : undefined} now={now} />;
 }
 
 export function App() {
@@ -449,20 +418,28 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    // The repo's own spelling once loaded (the hash may be lower case).
-    const repo = route.page === 'project' ? data?.projects.find((p) => p.repo.toLowerCase() === route.repo.toLowerCase())?.repo : undefined;
-    document.title = titleOf(repo ? { page: 'project', repo } : route, q);
-  }, [route, q, data]);
+    document.title = titleOf(route, q);
+  }, [route, q]);
+
+  // An old project URL (or a project card) opens the board filtered to it; once the board has taken the filter, the
+  // address becomes plain #/ so the chips stay in charge.
+  useEffect(() => {
+    if (data && route.page === 'board' && route.only) {
+      history.replaceState(null, '', '#/' + (q ? `?q=${encodeURIComponent(q)}` : ''));
+      setState({ route: { page: 'board' }, q });
+    }
+  }, [data, route, q]);
 
   const go = (r: Route) => {
     location.hash = hrefOf(r);
     scrollTo(0, 0);
   };
   const setQ = (value: string) => {
-    const h = hrefOf(route) + (value ? `?q=${encodeURIComponent(value)}` : '');
-    history.replaceState(null, '', h);
-    setState({ route, q: value });
+    const to: Route = value ? { page: 'board' } : route;
+    history.replaceState(null, '', hrefOf(to) + (value ? `?q=${encodeURIComponent(value)}` : ''));
+    setState({ route: to, q: value });
   };
+  const onBoard = route.page === 'board' || !!q;
 
   return (
     <>
@@ -470,10 +447,10 @@ export function App() {
         <a className="brand" href="#/" onClick={() => setQ('')}>
           <img src="/logo.svg" alt="" width="20" height="20" data-testid="logo" /> backlogkit
         </a>
-        <a href="#/" className={route.page === 'home' && !q ? 'on' : ''}>Projects</a>
-        <a href="#/all" className={route.page === 'all' && !q ? 'on' : ''}>All repos</a>
+        <a href="#/" className={onBoard ? 'on' : ''}>Board</a>
+        <a href="#/projects" className={route.page === 'projects' && !q ? 'on' : ''}>Projects</a>
         <a href="#/ideas" className={route.page === 'ideas' && !q ? 'on' : ''}>Ideas</a>
-        <input type="search" placeholder="Search items by text or ID…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input type="search" placeholder="Search the board by text or ID…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
         {data && <span className="muted stamp" title={`Read from GitHub at ${data.generatedAt}`}>read {new Date(data.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
       </nav>
       <main>

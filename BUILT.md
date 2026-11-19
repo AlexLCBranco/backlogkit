@@ -2,7 +2,13 @@
 
 Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never here.
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
-Suite time: last ~0.5 min (2026-11-18) · longest ~0.5 min (2026-11-18)
+Suite time: last ~0.3 min (2026-11-19) · longest ~0.5 min (2026-11-18)
+
+## 2026-11-19
+- BL-9 — Board home page: Later → Next → Now → Built, across all repos (v1.7.0) (took 6 min, suite 0.3 min)
+  The home page is now one board of every repo's ideas, held, ready and last-7-days built items, one line each (click to open), with Blocked badges, counts, project filter chips and an All built page; the project page and All repos view are gone.
+- BL-10 — Compact project cards (v1.7.0)
+  Each card's details are one line (version · devices · pushed · built, then live site and repo links); suite time and estimates are in the card's tooltip.
 
 ## 2026-11-18
 - BL-8 — Time estimates: build time and local test suite time (v1.6.0) (took 4 min, suite 0.5 min)

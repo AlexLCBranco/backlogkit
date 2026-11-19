@@ -2,6 +2,27 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-19 — BL-9, BL-10
+
+**Built**
+- BL-9 — Board home page (v1.7.0): `#/` is now a board with Later (every IDEAS.md + Unassigned), Next (Held), Now
+  (Ready) and Built (last 7 days, "All built" link to a new `#/built` page). One line per item (tag, ID, title), click
+  to open in place, red Blocked badge, column counts and the summary line, project chips remembered in this browser,
+  grouped by the Projects sort order. Project cards, Ideas-page repo links and old `#/p/<repo>` URLs open the board
+  filtered to that repo; `#/all` opens the board. Project page and All repos view removed. Copy shows on hover.
+  Search now filters the board from any page; while searching, Built looks through every day, not just 7.
+  Estimates: item badge when opened, and a total under Now and Next.
+- BL-10 — Compact project cards (v1.7.0): one line `v… · devices · pushed … · built …` then live site and repo
+  links; Backlog changed row gone (still the sort key); suite time and estimate total in the card's tooltip.
+  Tests: unit (columns, placement, Blocked counted once, 7-day cutoff, chips + storage, old URLs, search, card meta,
+  dashes, tooltip), e2e (the same in a real browser with a fixed clock, copy on hover, sort order shared with the board).
+  Both built together: ~6 min by the clock; full local suite ~0.3 min (16 s).
+
+**Decided without the spec saying**: project cards still show "Planned N (Ready / Held) · Blocked N"; Unassigned ideas
+have no chip (shown under All only); BL-11's estimate line is a guess.
+
+**Blocked**: none. **Ideas added**: none. **Test by hand**: nothing.
+
 ## 2026-11-18 — BL-5, BL-6, BL-7, BL-8
 
 **Built**
