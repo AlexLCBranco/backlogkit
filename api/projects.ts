@@ -3,7 +3,7 @@
 // function instance and at Vercel's edge (s-maxage), so a burst of visits makes one round of GitHub requests.
 
 import { loadAll } from '../lib/github.mjs';
-import { movesEnabled } from './move';
+import { movesEnabled } from '../lib/moves-env.mjs';
 
 const TTL_MS = 60_000;
 let cache: { at: number; body: string } | null = null;

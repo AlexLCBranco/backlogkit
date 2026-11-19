@@ -23,6 +23,10 @@ prefix in FEATURE_BACKLOG.md or BUILT.md, and a repo with no IDs yet is refused 
 an unassigned move is two commits (target repo first, so a failure leaves the idea in both places, never lost, and
 says so).
 
+**Follow-up fix (v1.9.1)**: v1.9.0 took the live site down ("Could not load projects") for about 15 minutes:
+api/projects.ts imported ./move without a file extension, which Vite and Vitest accept but Node on Vercel does not.
+Fixed, and a new test loads every function under plain Node (it fails on the v1.9.0 code).
+
 **Blocked**: none. **Ideas added**: none.
 
 **You must do by hand** (needs your logins): create the fine-grained token (all repos, Contents: read and write) and

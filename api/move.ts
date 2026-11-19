@@ -12,13 +12,13 @@ import { FILES, SELF, UNASSIGNED } from '../lib/github.mjs';
 import { makeWriter, type Head } from '../lib/github-write.mjs';
 import { ID_RE, MoveError, cutIdea, heldToReady, ideaToHeld } from '../lib/moves.mjs';
 import { counts, parseBacklog, parseIdeas } from '../lib/lists.mjs';
+import { movesEnabled } from '../lib/moves-env.mjs';
 
 const REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const TRIES = 3;
 export const FAIL_DELAY_MS = 400;
 
-/** Both env vars set: what /api/projects reports as canMove. */
-export const movesEnabled = () => !!(process.env.OWNER_PASSWORD?.trim() && process.env.GITHUB_WRITE_TOKEN?.trim());
+export { movesEnabled };
 
 const digest = (s: string) => createHash('sha256').update(s).digest();
 export function passwordOk(given: string | null): boolean {

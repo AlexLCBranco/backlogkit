@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-19
+- Fix: the site failed to load after v1.9.0 (v1.9.1)
+  The project list loads again; v1.9.0's server code had an import that works in tests but not on Vercel.
 - BL-11 — One-click moves: idea → Next (Ideas page), Next → Now (board) (v1.9.0) (took 8 min, suite 0.4 min)
   After unlocking with the owner password (Owner, top right), each idea has "→ Next" (unassigned ones pick a repo first) and each Next item "→ Now"; each click is one commit to that repo on GitHub.
 - BL-12 — Board redesign: ideas off the board, Now first, readable titles (v1.8.0) (took 5 min, suite 0.4 min)
