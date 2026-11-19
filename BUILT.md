@@ -28,6 +28,7 @@ Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 - BL-10 — Compact project cards (v1.7.0)
   Each card's details are one line (version · devices · pushed · built, then live site and repo links); suite time and estimates are in the card's tooltip.
 ### Internal
+- CI: the live check waits for this version or a newer one (pushes in a row made it fail when a later push deployed first)
 - Logo e2e test waits for the image to load instead of reading it once (it failed on the live site when the logo loaded slowly)
 
 ## 2026-11-18

@@ -41,15 +41,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Wait for this version on the live site
-        run: |
-          want=$(node -p "require('./package.json').version")
-          for i in $(seq 60); do
-            got=$(curl -fsS "${{ vars.LIVE_URL }}/version.json" | node -pe "JSON.parse(require('fs').readFileSync(0)).version" 2>/dev/null || true)
-            [ "$got" = "$want" ] && exit 0
-            sleep 10
-          done
-          echo "live site still at $got, wanted $want"; exit 1
+      - name: Wait for this version (or a newer one) on the live site
+        run: npx tsx scripts/wait-live.ts
+        env:
+          LIVE_URL: ${{ vars.LIVE_URL }}
       - run: npx playwright test
         env:
           LIVE_URL: ${{ vars.LIVE_URL }}

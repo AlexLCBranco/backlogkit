@@ -37,6 +37,9 @@ Tests: 154 unit + 22 e2e, all passing; full local suite ~0.4 min (26 s).
 - A marquee can also start on an item line (as in calendarkit); a plain click on an item opens it and keeps the
   selection.
 
+**Internal**: CI's live check failed on the BL-14 push (it waited for exactly v1.10.0 while the BL-16 push had already
+deployed v1.12.0). It now accepts this version or a newer one (`scripts/wait-live.ts`, with a test).
+
 **Blocked**: none. **Ideas added**: none.
 
 **Test by hand**: nothing required. Only feel: try a marquee drag and the Answer box on the live site.
