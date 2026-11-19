@@ -1,4 +1,4 @@
-// The site: the Board (home: Later → Next → Now → Built across all repos, BL-9), Projects (one compact card each,
+// The site: the Board (home: Now, Next and Built stacked, across all repos, BL-9/BL-12), Projects (one compact card each,
 // BL-10), Ideas, and the full Built list; search from the top bar filters the board. Routes live in the hash:
 // #/ (board), #/projects, #/ideas, #/built, plus ?q=<search>. Old #/p/<repo> URLs open the board filtered to that
 // repo; old #/all opens the board.
@@ -12,15 +12,15 @@ import { estimateTotal, formatDuration, ideaMarkdown } from '../lib/lists.mjs';
 import {
   BUILT_DAYS,
   COLUMNS,
-  UNASSIGNED,
   boardItems,
+  builtCounts,
   builtCutoff,
+  builtGroups,
   inFilter,
   loadFilter,
   matches,
+  repoColor,
   saveFilter,
-  summarize,
-  summaryLine,
   type BoardItem,
 } from './board';
 
@@ -64,8 +64,9 @@ export function estimateText(items: { estimate: Estimate | null }[]): string {
   return t.estimated ? `build ${formatDuration(t.build)} · suite ${formatDuration(t.suite)} (${t.estimated} of ${t.total} items estimated)` : `${DASH} (no estimates yet)`;
 }
 
+/** Shown only when at least one item has an estimate (BL-12: no "— (no estimates yet)" line). */
 export function EstimateTotal({ items, label = 'Estimated' }: { items: { estimate: Estimate | null }[]; label?: string }) {
-  if (!items.length) return null;
+  if (!estimateTotal(items).estimated) return null;
   return (
     <p className="muted estimate-total" data-testid="estimate-total">
       {label}: {estimateText(items)}
@@ -199,12 +200,17 @@ export function ProjectsPage({ data, go }: { data: Data; go: (r: Route) => void 
   );
 }
 
-function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
+/** A repo's colour dot; the name shows on hover. */
+function RepoDot({ repo }: { repo: string }) {
+  return <span className="dot" data-testid="repo-dot" title={repo} aria-label={repo} role="img" style={{ background: repoColor(repo) }} />;
+}
+
+function BoardLine({ item, first, dot }: { item: BoardItem; first: boolean; dot: boolean }) {
   const label = `Copy ${item.id ?? item.title}`;
   return (
     <details className={`bitem${item.blocked ? ' is-blocked' : ''}${first ? ' group-start' : ''}`} data-testid="board-item" data-repo={item.repo}>
       <summary>
-        <span className={`tag${item.repo === UNASSIGNED ? ' tag-unassigned' : ''}`}>{item.repo}</span>
+        {dot && <RepoDot repo={item.repo} />}
         {item.id && <span className="id">{item.id}</span>}
         <span className="title">{item.title}</span>
         {item.blocked && <span className="badge blocked">Blocked</span>}
@@ -224,9 +230,12 @@ function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
   );
 }
 
+const NOTHING = <p className="muted empty">Nothing here</p>;
+
 /**
- * The home board (BL-9). `only` (from an old project URL or a project card) selects that one project; otherwise the
- * chips this browser remembers. While searching, Built looks through every day, not just the last 7.
+ * The home board (BL-9, BL-12): Now, Next and Built stacked full width. `only` (from an old project URL or a project
+ * card) selects that one project; otherwise the chips this browser remembers. Built is one collapsed line until
+ * clicked; while searching it looks through every day, not just the last 7, and opens so the matches show.
  */
 export function Board({ data, q, only, now }: { data: Data; q: string; only?: string; now?: Date }) {
   const sort = loadSort();
@@ -243,17 +252,21 @@ export function Board({ data, q, only, now }: { data: Data; q: string; only?: st
       saveFilter([one]);
     }
   }, [only, projects]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [builtOpen, setBuiltOpen] = useState(false);
   const choose = (next: string[]) => {
     setSelected(next);
     saveFilter(next);
   };
   const valid = selected.filter((s) => projects.some((p) => p.repo === s));
+  const dots = valid.length !== 1; // one repo shown: a dot would say nothing
   const searching = !!q.trim();
   const cutoff = builtCutoff(now ?? new Date());
   const items = useMemo(() => boardItems(data, sort, searching ? null : cutoff), [data, sort, searching, cutoff]);
   const visible = items.filter((i) => inFilter(i, valid) && matches(i, q));
-  const summary = summarize(visible);
   const builtLabel = searching ? 'Built' : `Built (${BUILT_DAYS} days)`;
+  const groups = builtGroups(visible);
+  const builtTotal = groups.reduce((n, g) => n + g.items.length, 0);
+  const open = builtTotal > 0 && (builtOpen || searching);
 
   return (
     <div className="board-page">
@@ -269,32 +282,51 @@ export function Board({ data, q, only, now }: { data: Data; q: string; only?: st
             </button>
           );
         })}
+        {searching && <span className="muted search-note">matching “{q.trim()}”</span>}
       </div>
-      <p className="board-summary" data-testid="board-summary">
-        {summaryLine(summary, builtLabel)}
-        {searching && <span className="muted"> · matching “{q.trim()}”</span>}
-      </p>
       <div className="board">
-        {COLUMNS.map((c) => {
+        {COLUMNS.filter((c) => c.key !== 'built').map((c) => {
           const list = visible.filter((i) => i.column === c.key);
           return (
-            <section key={c.key} className={`col col-${c.key}`} data-testid={`col-${c.key}`}>
+            <section key={c.key} className={`col col-${c.key}${list.length ? '' : ' is-empty'}`} data-testid={`col-${c.key}`}>
               <h2>
-                {c.key === 'built' ? builtLabel : c.label} <span className="muted count">{list.length}</span>
+                {c.label} <span className="muted count">{list.length}</span>
               </h2>
-              {(c.key === 'now' || c.key === 'next') && <EstimateTotal items={list} />}
-              {!list.length && <p className="muted empty">{DASH}</p>}
+              <EstimateTotal items={list} />
+              {!list.length && NOTHING}
               {list.map((i, n) => (
-                <BoardLine key={i.key} item={i} first={n > 0 && list[n - 1]!.repo !== i.repo} />
+                <BoardLine key={i.key} item={i} dot={dots} first={n > 0 && list[n - 1]!.repo !== i.repo} />
               ))}
-              {c.key === 'built' && (
-                <p className="all-built">
-                  <a href={hrefOf({ page: 'built' })}>All built</a>
-                </p>
-              )}
             </section>
           );
         })}
+        <section className={`col col-built${builtTotal ? '' : ' is-empty'}`} data-testid="col-built">
+          <h2>
+            <button type="button" className="fold" aria-expanded={open} disabled={!builtTotal} onClick={() => setBuiltOpen(!open)} data-testid="built-toggle">
+              {builtTotal > 0 && <span className="caret" aria-hidden="true">{open ? '▾' : '▸'}</span>}
+              {builtLabel} <span className="muted count">{builtTotal}</span>
+              {builtTotal > 0 && <span className="muted built-counts" data-testid="built-counts"> — {builtCounts(groups)}</span>}
+            </button>
+          </h2>
+          {!builtTotal && NOTHING}
+          {open &&
+            groups.map((g) => (
+              <div key={g.repo} className="repo-group" data-testid="built-group" data-repo={g.repo}>
+                <h3>
+                  {dots && <RepoDot repo={g.repo} />}
+                  {g.repo} <span className="muted count">{g.items.length}</span>
+                </h3>
+                {g.items.map((i) => (
+                  <BoardLine key={i.key} item={i} dot={false} first={false} />
+                ))}
+              </div>
+            ))}
+          {open && (
+            <p className="all-built">
+              <a href={hrefOf({ page: 'built' })}>All built</a>
+            </p>
+          )}
+        </section>
       </div>
     </div>
   );

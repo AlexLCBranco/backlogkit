@@ -2,6 +2,26 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-19 — BL-12
+
+**Built**
+- BL-12 — Board redesign (v1.8.0): the board is Now, Next, Built stacked full width (Later and every idea gone; ideas
+  only on the Ideas page, and search no longer finds them on the board). Titles wrap (up to 2 lines), are the brightest
+  text on the row, IDs dimmed; Now has bigger titles and a highlighted border. Repos are colour dots (stable hue from
+  the repo name, name on hover), hidden when one repo is filtered. Built is one line, e.g. "Built (7 days) 5 — demo 4 ·
+  zulu 1", and opens on click grouped by repo (most items first, newest first within). Summary line and "no estimates
+  yet" removed; selected chips are filled with the accent colour; empty sections say "Nothing here" without a box.
+  Tests: unit (order, no ideas, dots, Built fold/groups/counts, empty sections, filter) and e2e (stacked full width,
+  long title wraps unclipped at 700 px, Built collapsed/expands, dot colours stable and hidden on one repo, filled chips,
+  Now larger, title brighter than ID). ~5 min by the clock; full local suite ~0.4 min (21 s).
+
+**Decided without the spec saying**: while searching, Built opens by itself so matches are visible; repo groups in
+Built and the collapsed counts are ordered by item count (as in the spec's example); rows inside a Built repo group
+have no dot (the group heading has it); a title longer than 2 lines at the current width still ends in "…" until opened
+(the spec's "up to 2 lines"). No estimate line was added to BL-12 since it shipped in the same commit.
+
+**Blocked**: none. **Ideas added**: none. **Test by hand**: nothing (whether the new layout feels right is your call).
+
 ## 2026-11-19 — BL-9, BL-10
 
 **Built**

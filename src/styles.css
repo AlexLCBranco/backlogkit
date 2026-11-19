@@ -97,27 +97,43 @@ ul.idea-list li { margin: 3px 0; }
 .estimate-total { margin: -4px 0 6px; font-size: 12.5px; }
 .estimate-total b { color: var(--text); font-weight: 600; }
 
-/* The board (BL-9): Later → Next → Now → Built. One line per item; click opens the full text in place. */
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+/* The board (BL-9, redesigned in BL-12): Now, Next, Built stacked full width. One row per item, the title wrapping
+   to at most 2 lines; click opens the full text in place. */
+main:has(.board-page) { max-width: none; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
 .chip { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
 .chip:hover { color: var(--text); border-color: #3d4556; }
-.chip[aria-pressed='true'] { background: #1d2740; border-color: var(--accent); color: var(--text); }
-.board-summary { margin: 0 0 10px; font-size: 13px; }
-.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
-.col { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px 10px 10px; min-width: 0; }
+.chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #0b0f1a; font-weight: 600; }
+.search-note { font-size: 13px; margin-left: 6px; }
+.board { display: flex; flex-direction: column; gap: 14px; }
+.col { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px 14px 10px; min-width: 0; }
+.col.is-empty { background: none; border-color: transparent; padding-top: 0; padding-bottom: 0; }
 .col h2 { margin: 10px 0 8px; }
-.col .empty { margin: 4px 0; }
+.col .empty { margin: 0 0 4px; font-size: 13px; }
+.col-now { border-color: #34466e; }
+.col-now h2 { font-size: 18px; }
+.col-now .bitem summary { padding: 9px 0; font-size: 15px; }
 .bitem { border-bottom: 1px solid var(--line); }
+.bitem:last-child { border-bottom: none; }
 .bitem.group-start { border-top: 1px solid #3d4556; }
-.bitem summary { display: flex; align-items: center; gap: 6px; padding: 5px 0; cursor: pointer; list-style: none; white-space: nowrap; }
+.bitem summary { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; list-style: none; }
 .bitem summary::-webkit-details-marker { display: none; }
-.bitem summary .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.bitem summary .tag, .bitem summary .id, .bitem summary .badge, .bitem summary .copy { flex: none; }
+.bitem summary .title { flex: 1; min-width: 0; color: var(--text); font-weight: 500; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.bitem[open] summary .title { display: block; }
+.bitem summary .id { color: var(--muted); opacity: 0.75; }
+.bitem summary .dot, .bitem summary .id, .bitem summary .badge, .bitem summary .copy { flex: none; }
 .bitem summary .badge { margin: 0; }
 .bitem summary .copy { margin-left: 0; visibility: hidden; }
 .bitem summary:hover .copy, .bitem summary:focus-within .copy, .bitem summary .copy.copied { visibility: visible; }
-.bitem[open] summary .title { white-space: normal; }
 .bitem .body { white-space: pre-wrap; margin: 0 0 8px 4px; color: #c9ced8; font-size: 13px; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.fold { display: inline-flex; align-items: baseline; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.fold:disabled { cursor: default; }
+.fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fold .caret { width: 10px; color: var(--muted); }
+.fold .built-counts { font-weight: 400; font-size: 13px; }
+.repo-group h3 { display: flex; align-items: center; gap: 7px; margin: 12px 0 2px; font-size: 13.5px; }
+.repo-group + .repo-group { border-top: 1px solid #3d4556; padding-top: 2px; }
 .bitem .body .when { font-size: 12px; }
 .bitem .body .badges .badge { margin: 2px 6px 4px 0; }
 .bitem.is-blocked summary .title { color: #f3b0b0; }

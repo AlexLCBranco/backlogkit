@@ -1,29 +1,26 @@
-// The home board (BL-9): Later → Next → Now → Built across all repos. Only a new view of the existing sections:
-// Later = every IDEAS.md plus UNASSIGNED_IDEAS.md, Next = "## Held", Now = "## Ready", Built = BUILT.md's last 7 days.
-// Blocked is a badge, never a column. Within a column items are grouped by project in the card sort order (Unassigned
-// first, as on the Ideas page), each file's order kept. Pure functions; the page is in App.tsx.
-import type { BuiltItem, Data, Estimate, Idea, PlannedItem, Project } from './types';
+// The home board (BL-9, redesigned in BL-12): stacked full-width sections Now → Next → Built across all repos.
+// Now = "## Ready", Next = "## Held", Built = BUILT.md's last 7 days. Planned and built work only: ideas live on the
+// Ideas page, never here. Blocked is a badge, never a section. Within Now and Next items are grouped by project in the
+// card sort order, each file's order kept; Built is grouped by repo (builtGroups). Pure functions; the page is in App.tsx.
+import type { BuiltItem, Data, Estimate, PlannedItem, Project } from './types';
 import { sortProjects, type SortKey } from './sort';
-import { ideaMarkdown, itemMarkdown } from '../lib/lists.mjs';
+import { itemMarkdown } from '../lib/lists.mjs';
 
-export type Column = 'later' | 'next' | 'now' | 'built';
+export type Column = 'now' | 'next' | 'built';
 export const COLUMNS: { key: Column; label: string }[] = [
-  { key: 'later', label: 'Later' },
-  { key: 'next', label: 'Next' },
   { key: 'now', label: 'Now' },
+  { key: 'next', label: 'Next' },
   { key: 'built', label: 'Built' },
 ];
 export const BUILT_DAYS = 7;
-export const UNASSIGNED = 'unassigned';
 
 export interface BoardItem {
   key: string;
   column: Column;
-  /** The project tag: the repo, or "unassigned" for UNASSIGNED_IDEAS.md. */
   repo: string;
   id: string | null;
   title: string;
-  /** What opens in place: the full spec, or the built item's sentence; empty for one-line ideas. */
+  /** What opens in place: the full spec, or the built item's sentence. */
   body: string;
   blocked: boolean;
   date: string | null;
@@ -54,19 +51,6 @@ const planned = (repo: string, column: Column, i: PlannedItem, n: number): Board
   took: null,
   markdown: itemMarkdown(i),
 });
-const idea = (repo: string, i: Idea, n: number): BoardItem => ({
-  key: `${repo}:later:${n}`,
-  column: 'later',
-  repo,
-  id: i.id,
-  title: i.title,
-  body: '',
-  blocked: false,
-  date: null,
-  estimate: null,
-  took: null,
-  markdown: ideaMarkdown(i),
-});
 const built = (repo: string, date: string, i: BuiltItem, n: number): BoardItem => ({
   key: `${repo}:built:${date}:${n}`,
   column: 'built',
@@ -88,9 +72,7 @@ const built = (repo: string, date: string, i: BuiltItem, n: number): BoardItem =
 export function boardItems(data: Data, sort: SortKey, cutoff: string | null): BoardItem[] {
   const projects: Project[] = sortProjects(data.projects, sort);
   const out: BoardItem[] = [];
-  data.unassigned.ideas.forEach((i, n) => out.push(idea(UNASSIGNED, i, n)));
   for (const p of projects) {
-    p.ideas.forEach((i, n) => out.push(idea(p.repo, i, n)));
     let n = 0;
     for (const s of p.planned) {
       if (s.kind === 'other') continue;
@@ -122,22 +104,25 @@ export function inFilter(item: BoardItem, selected: string[]): boolean {
   return !selected.length || selected.includes(item.repo);
 }
 
-export interface Summary {
-  now: number;
-  next: number;
-  later: number;
-  blocked: number;
-  built: number;
+/**
+ * Built grouped by repo (BL-12): each repo once, the repo with most items first (ties by name), newest first within
+ * a repo (the input is already newest first, so each repo's order is kept).
+ */
+export function builtGroups(items: BoardItem[]): { repo: string; items: BoardItem[] }[] {
+  const by = new Map<string, BoardItem[]>();
+  for (const i of items) if (i.column === 'built') by.set(i.repo, [...(by.get(i.repo) ?? []), i]);
+  return [...by].map(([repo, list]) => ({ repo, items: list })).sort((a, b) => b.items.length - a.items.length || a.repo.localeCompare(b.repo));
 }
 
-/** The board header's counts; a blocked item counts once (it stays in its own column). */
-export function summarize(items: BoardItem[]): Summary {
-  const of = (c: Column) => items.filter((i) => i.column === c).length;
-  return { now: of('now'), next: of('next'), later: of('later'), blocked: items.filter((i) => i.blocked).length, built: of('built') };
-}
+/** "footykit 14 · backlogkit 11": Built's collapsed line. */
+export const builtCounts = (groups: { repo: string; items: unknown[] }[]) => groups.map((g) => `${g.repo} ${g.items.length}`).join(' · ');
 
-export const summaryLine = (s: Summary, builtLabel = `Built (${BUILT_DAYS} days)`) =>
-  `Now ${s.now} · Next ${s.next} · Later ${s.later} · Blocked ${s.blocked} · ${builtLabel} ${s.built}`;
+/** One stable colour per repo (BL-12): a hue from the repo name, so it never changes when repos are added or sorted. */
+export function repoColor(repo: string): string {
+  let h = 0;
+  for (const ch of repo.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360} 65% 62%)`;
+}
 
 export const FILTER_STORAGE_KEY = 'backlogkit.board.projects';
 

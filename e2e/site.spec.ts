@@ -10,6 +10,8 @@ const pkgVersion = (JSON.parse(readFileSync('package.json', 'utf8')) as { versio
 // The fixture's built days are 2026-11-12 … 2026-11-17; the board's clock is fixed so "last 7 days" stays stable.
 const TODAY = new Date('2026-11-19T12:00:00');
 const lines = (page: Page, col: string) => page.getByTestId(`col-${col}`).getByTestId('board-item').locator('summary').allTextContents();
+const heads = (page: Page) => page.locator('[data-testid^="col-"] > h2').allTextContents();
+const LONG = 'A very long title that keeps going well past the width of a narrow window so it has to wrap onto a second line';
 
 test.describe('mocked GitHub', () => {
   test.skip(live, 'local only');
@@ -20,63 +22,145 @@ test.describe('mocked GitHub', () => {
     await page.clock.setFixedTime(TODAY);
   });
 
-  test('board home: four columns, items in the right column, Blocked badge, counts (BL-9)', async ({ page }) => {
+  test('board home: Now, Next, Built stacked full width, no ideas, Blocked badge, counts (BL-9, BL-12)', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle('backlogkit · Board');
     const cols = page.locator('[data-testid^="col-"]');
-    await expect.poll(() => cols.evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))).toEqual(['col-later', 'col-next', 'col-now', 'col-built']);
-    const boxes = await Promise.all(['later', 'next', 'now', 'built'].map((c) => page.getByTestId(`col-${c}`).boundingBox()));
-    for (let i = 1; i < boxes.length; i++) expect(boxes[i - 1]!.x + boxes[i - 1]!.width).toBeLessThanOrEqual(boxes[i]!.x); // left to right
+    await expect.poll(() => cols.evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))).toEqual(['col-now', 'col-next', 'col-built']);
+    const boxes = await Promise.all(['now', 'next', 'built'].map((c) => page.getByTestId(`col-${c}`).boundingBox()));
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i - 1]!.y + boxes[i - 1]!.height).toBeLessThanOrEqual(boxes[i]!.y); // top to bottom
+    const vw = page.viewportSize()!.width;
+    expect(boxes[0]!.width).toBeGreaterThan(vw - 80); // the full width of the screen
 
-    await expect.poll(() => lines(page, 'later')).toEqual(['unassignedU-1Orphan gadget for no repo (2026-11-18)', 'demoI-1Dark mode toggle (2026-11-01)', 'demoI-2Something long that wraps (2026-11-02)']);
-    expect(await lines(page, 'next')).toEqual(['demoDM-3Later thing']);
-    expect(await lines(page, 'now')).toEqual(['alphaAL-1Alpha item', 'alphaAL-2Odd estimate', 'demoDM-1First thing', 'demoDM-2Stuck thingBlocked']);
-    expect(await lines(page, 'built')).toEqual(['demoDM-5Newest thing (v1.3.0)', 'demoA fix without ID (v1.2.1)', 'demov1.2.0: old style line', 'demoDM-0Older thing (v1.1.0)']); // zulu's 11-12 is older than 7 days
+    expect(await lines(page, 'now')).toEqual(['AL-1Alpha item', 'AL-2Odd estimate', 'DM-1First thing', 'DM-2Stuck thingBlocked', `ZU-2${LONG}`]);
+    expect(await lines(page, 'next')).toEqual(['DM-3Later thing']);
     await expect(page.getByTestId('col-now').locator('.is-blocked .badge.blocked')).toHaveText('Blocked');
     await expect(page.getByTestId('col-now').locator('.badge.blocked')).toHaveCSS('background-color', 'rgb(107, 31, 39)'); // red
-    await expect(page.getByTestId('board-summary')).toHaveText('Now 4 · Next 1 · Later 3 · Blocked 1 · Built (7 days) 4');
-    await expect(page.getByTestId('col-now').locator('h2')).toHaveText('Now 4');
+    expect(await heads(page)).toEqual(['Now 5', 'Next 1', '▸Built (7 days) 4 — demo 4']); // zulu's 11-12 is older than 7 days
+    await expect(page.getByTestId('board-summary')).toHaveCount(0);
+    await expect(page.getByText(/no estimates yet/)).toHaveCount(0);
 
-    const item = page.getByTestId('col-now').getByTestId('board-item').nth(2);
-    await item.locator('summary').click();
-    await expect(item.getByText('Line one of the spec.')).toBeVisible();
-    await item.locator('summary').click();
-    await expect(item.getByText('Line one of the spec.')).toBeHidden();
+    // No idea anywhere on the board, Built opened too.
+    await page.getByTestId('built-toggle').click();
+    const all = (await page.getByTestId('board-item').allTextContents()).join('\n');
+    expect(all).not.toMatch(/\b[IU]-\d+/);
+    expect(all).not.toContain('Orphan gadget');
 
+    // Now is the most prominent section: bigger titles than Next.
+    const size = (col: string) => page.getByTestId(`col-${col}`).locator('summary .title').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    expect(await size('now')).toBeGreaterThan(await size('next'));
+    // The title is the brightest text on the row; the ID is dimmed.
+    const row = page.getByTestId('col-now').getByTestId('board-item').nth(2);
+    const lum = (sel: string) => row.locator(sel).evaluate((e) => {
+      const [r, g, b] = getComputedStyle(e).color.match(/[\d.]+/g)!.map(Number);
+      return (0.2126 * r! + 0.7152 * g! + 0.0722 * b!) * Number(getComputedStyle(e).opacity);
+    });
+    expect(await lum('summary .title')).toBeGreaterThan(await lum('summary .id'));
+
+    await row.locator('summary').click();
+    await expect(row.getByText('Line one of the spec.')).toBeVisible();
+    await row.locator('summary').click();
+    await expect(row.getByText('Line one of the spec.')).toBeHidden();
+  });
+
+  test('a long title wraps instead of being cut off with "…" (BL-12)', async ({ page }) => {
+    await page.setViewportSize({ width: 700, height: 800 });
+    await page.goto('/');
+    const title = page.getByTestId('col-now').getByTestId('board-item').last().locator('summary .title');
+    await expect(title).toHaveText(LONG);
+    const m = await title.evaluate((e) => ({ overflow: getComputedStyle(e).textOverflow, lh: parseFloat(getComputedStyle(e).lineHeight), h: e.clientHeight, sh: e.scrollHeight, sw: e.scrollWidth, w: e.clientWidth }));
+    expect(m.overflow).not.toBe('ellipsis');
+    expect(m.h).toBeGreaterThan(m.lh * 1.5); // on two lines
+    expect(m.sh).toBeLessThanOrEqual(m.h + 1); // nothing hidden
+    expect(m.sw).toBeLessThanOrEqual(m.w + 1);
+  });
+
+  test('Built: collapsed to one line, a click opens it grouped by repo, each repo once (BL-12)', async ({ page }) => {
+    await page.goto('/#/?q=AL-1'); // nothing built matches
+    await expect(page.getByTestId('col-built')).toContainText('Nothing here');
+    await expect(page.getByTestId('built-toggle')).toBeDisabled();
+
+    await page.clock.setFixedTime(new Date('2026-11-17T12:00:00')); // 7 days: 11-11 … 11-17, so zulu's 11-12 is in
+    await page.goto('/');
+    const toggle = page.getByTestId('built-toggle');
+    await expect(toggle).toHaveText('▸Built (7 days) 5 — demo 4 · zulu 1');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('col-built').getByTestId('board-item')).toHaveCount(0);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect.poll(() => page.getByTestId('built-group').evaluateAll((els) => els.map((e) => e.getAttribute('data-repo')))).toEqual(['demo', 'zulu']);
+    expect(await lines(page, 'built')).toEqual(['DM-5Newest thing (v1.3.0)', 'A fix without ID (v1.2.1)', 'v1.2.0: old style line', 'DM-0Older thing (v1.1.0)', 'ZU-1Timed thing (v0.2.0)']);
     await page.getByTestId('col-built').getByRole('link', { name: 'All built' }).click();
     await expect(page).toHaveURL(/#\/built$/);
     await expect(page.getByTestId('all-built-day').last()).toContainText('ZU-1');
   });
 
+  test('empty sections show one muted line, not an empty box (BL-12)', async ({ page }) => {
+    await page.goto('/#/?q=DM-1');
+    const next = page.getByTestId('col-next');
+    await expect(next).toContainText('Nothing here');
+    await expect(next).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(next).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+  });
+
+  test('repo dots: one stable colour per repo, name on hover, hidden when one repo is filtered (BL-12)', async ({ page }) => {
+    await page.goto('/');
+    const dots = page.getByTestId('col-now').getByTestId('repo-dot');
+    await expect(dots).toHaveCount(5);
+    expect(await dots.evaluateAll((els) => els.map((e) => e.getAttribute('title')))).toEqual(['alpha', 'alpha', 'demo', 'demo', 'zulu']);
+    const bg = (i: number) => dots.nth(i).evaluate((e) => getComputedStyle(e).backgroundColor);
+    expect(await bg(0)).toBe(await bg(1));
+    expect(await bg(0)).not.toBe(await bg(2));
+    await expect(page.locator('.bitem .tag')).toHaveCount(0);
+    const first = await bg(2);
+    await page.reload();
+    expect(await bg(2)).toBe(first); // stable
+
+    const chips = page.getByRole('group', { name: 'Filter by project' }).getByRole('button');
+    await chips.filter({ hasText: 'demo' }).click();
+    await expect(page.getByTestId('repo-dot')).toHaveCount(0);
+    await page.getByTestId('built-toggle').click();
+    await expect(page.getByTestId('built-group')).toHaveCount(1);
+    await expect(page.getByTestId('repo-dot')).toHaveCount(0);
+    await chips.filter({ hasText: 'alpha' }).click(); // two repos: dots again
+    await expect(page.getByTestId('col-now').getByTestId('repo-dot')).toHaveCount(4);
+    await chips.filter({ hasText: 'All' }).click();
+  });
+
   test('Built keeps only the last 7 days', async ({ page }) => {
     await page.clock.setFixedTime(new Date('2026-11-22T12:00:00')); // 7 days: 11-16 … 11-22
     await page.goto('/');
-    await expect.poll(() => lines(page, 'built')).toEqual(['demoDM-5Newest thing (v1.3.0)', 'demoA fix without ID (v1.2.1)', 'demov1.2.0: old style line']);
+    await page.getByTestId('built-toggle').click();
+    await expect.poll(() => lines(page, 'built')).toEqual(['DM-5Newest thing (v1.3.0)', 'A fix without ID (v1.2.1)', 'v1.2.0: old style line']);
   });
 
-  test('project chips filter the board and are remembered; cards and old URLs open it filtered', async ({ page }) => {
+  test('project chips filter the board and are remembered; selected chips are filled; cards and old URLs open it filtered', async ({ page }) => {
     await page.goto('/');
     const chips = page.getByRole('group', { name: 'Filter by project' }).getByRole('button');
     await expect(chips).toHaveText(['All', 'alpha', 'demo', 'zulu', 'broken']); // card sort order
+    const fill = (name: string) => chips.filter({ hasText: name }).evaluate((e) => getComputedStyle(e).backgroundColor);
+    const off = await fill('alpha');
     await chips.filter({ hasText: 'alpha' }).click();
-    await expect(page.getByTestId('board-summary')).toHaveText('Now 2 · Next 0 · Later 0 · Blocked 0 · Built (7 days) 0');
+    expect(await fill('alpha')).not.toBe(off);
+    expect(await fill('alpha')).toBe('rgb(122, 162, 255)'); // filled with the accent colour
+    expect(await heads(page)).toEqual(['Now 2', 'Next 0', 'Built (7 days) 0']);
     await page.reload();
     await expect(chips.filter({ hasText: 'alpha' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('board-summary')).toHaveText('Now 2 · Next 0 · Later 0 · Blocked 0 · Built (7 days) 0');
+    await expect.poll(() => heads(page)).toEqual(['Now 2', 'Next 0', 'Built (7 days) 0']);
     await chips.filter({ hasText: 'All' }).click();
-    await expect(page.getByTestId('board-summary')).toHaveText('Now 4 · Next 1 · Later 3 · Blocked 1 · Built (7 days) 4');
+    await expect.poll(() => heads(page)).toEqual(['Now 5', 'Next 1', '▸Built (7 days) 4 — demo 4']);
 
     await page.getByRole('link', { name: 'Projects', exact: true }).click();
     await expect(page).toHaveTitle('backlogkit · Projects');
     await page.getByTestId('card-demo').click({ position: { x: 200, y: 50 } });
     await expect(page).toHaveURL(/#\/$/);
     await expect(chips.filter({ hasText: 'demo' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('board-summary')).toHaveText('Now 2 · Next 1 · Later 2 · Blocked 1 · Built (7 days) 4');
+    await expect.poll(() => heads(page)).toEqual(['Now 2', 'Next 1', '▸Built (7 days) 4 — demo 4']);
 
     await page.goto('/#/p/ZULU'); // an old project-page URL, any spelling
     await expect(page).toHaveURL(/#\/$/);
     await expect(chips.filter({ hasText: 'zulu' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('board-summary')).toHaveText('Now 0 · Next 0 · Later 0 · Blocked 0 · Built (7 days) 0');
+    await expect.poll(() => heads(page)).toEqual(['Now 1', 'Next 0', 'Built (7 days) 0']);
     await page.goto('/#/all'); // the old All repos view
     await expect(page.getByTestId('col-now')).toBeVisible();
   });
@@ -95,18 +179,14 @@ test.describe('mocked GitHub', () => {
     expect(await clipboard()).toBe('### DM-1 — First thing\nLine one of the spec.\n- a bullet\n  continued');
     await expect(row).not.toHaveAttribute('open');
 
+    await page.getByTestId('built-toggle').click();
     const built = page.getByTestId('col-built').getByTestId('board-item').first();
     await built.locator('summary').hover();
     await built.getByRole('button', { name: 'Copy DM-5' }).click();
     expect(await clipboard()).toBe('- DM-5 — Newest thing (v1.3.0)\n  What the owner sees now.');
-
-    const idea = page.getByTestId('col-later').getByTestId('board-item').first();
-    await idea.locator('summary').hover();
-    await idea.getByRole('button', { name: 'Copy U-1' }).click();
-    expect(await clipboard()).toBe('- U-1 — Orphan gadget for no repo (2026-11-18)');
   });
 
-  test('search filters the board, from any page', async ({ page }) => {
+  test('search filters the board, from any page; Built opens to show matches', async ({ page }) => {
     await page.goto('/#/projects');
     await page.getByRole('searchbox', { name: 'Search' }).fill('DM-5');
     await expect(page).toHaveTitle('backlogkit · search “DM-5”');
@@ -115,9 +195,11 @@ test.describe('mocked GitHub', () => {
     await page.getByRole('searchbox', { name: 'Search' }).fill('ZU-1'); // older than 7 days: search looks at every day
     await expect(page.getByTestId('col-built').getByTestId('board-item')).toHaveCount(1);
     await page.getByRole('searchbox', { name: 'Search' }).fill('thing');
-    await expect(page.getByTestId('board-summary')).toContainText('Now 2 · Next 1 · Later 1 · Blocked 1 · Built 3'); // DM-5, DM-0 and the 11-12 ZU-1
+    await expect.poll(() => heads(page)).toEqual(['Now 2', 'Next 1', '▾Built 3 — demo 2 · zulu 1']); // DM-5, DM-0 and the 11-12 ZU-1
+    await page.getByRole('searchbox', { name: 'Search' }).fill('orphan'); // an idea: never on the board
+    await expect(page.getByTestId('board-item')).toHaveCount(0);
     await page.getByRole('searchbox', { name: 'Search' }).fill('');
-    await expect(page.getByTestId('board-summary')).toHaveText('Now 4 · Next 1 · Later 3 · Blocked 1 · Built (7 days) 4');
+    await expect.poll(() => heads(page)).toEqual(['Now 5', 'Next 1', '▸Built (7 days) 4 — demo 4']);
   });
 
   test('compact project cards: one-line meta, links, dashes, tooltip (BL-10)', async ({ page }) => {
@@ -193,11 +275,11 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByRole('group', { name: 'Filter by project' }).getByRole('button', { name: 'demo' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('time estimates on the board: item badges, column totals, measured times (BL-8)', async ({ page }) => {
+  test('time estimates on the board: item badges, section totals only where estimated, measured times (BL-8, BL-12)', async ({ page }) => {
     await page.goto('/');
     const now = page.getByTestId('col-now');
-    await expect(now.getByTestId('estimate-total')).toHaveText('Estimated: build ~5 min · suite ~1 min (1 of 4 items estimated)');
-    await expect(page.getByTestId('col-next').getByTestId('estimate-total')).toHaveText('Estimated: — (no estimates yet)');
+    await expect(now.getByTestId('estimate-total')).toHaveText('Estimated: build ~5 min · suite ~1 min (1 of 5 items estimated)');
+    await expect(page.getByTestId('col-next').getByTestId('estimate-total')).toHaveCount(0); // nothing estimated: no line
     const items = now.getByTestId('board-item');
     await items.nth(0).locator('summary').click();
     await expect(items.nth(0).getByTestId('estimate')).toHaveText('build ~5 min · suite ~1 min');
@@ -253,7 +335,8 @@ test('live: real projects load from GitHub', async ({ page }) => {
   test.skip(!live, 'live only');
   await page.goto('/');
   await expect(page.getByTestId('col-now')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('board-summary')).toHaveText(/^Now \d+ · Next \d+ · Later \d+ · Blocked \d+ · Built \(7 days\) \d+$/);
+  await expect.poll(() => heads(page)).toEqual([expect.stringMatching(/^Now \d+$/), expect.stringMatching(/^Next \d+$/), expect.stringMatching(/^(▸Built \(7 days\) \d+ — .+|Built \(7 days\) 0)$/)]);
+  await expect(page.getByTestId('col-later')).toHaveCount(0);
   await page.goto('/#/projects');
   await expect(page.getByTestId('card-backlogkit')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('card-backlogkit').click({ position: { x: 200, y: 50 } });
