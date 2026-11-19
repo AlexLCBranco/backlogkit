@@ -2,6 +2,32 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-19 — BL-11
+
+**Built**
+- BL-11 — One-click moves (v1.9.0). Your choices: a new fine-grained token `GITHUB_WRITE_TOKEN` for writes (the read
+  token is untouched) and an owner password `OWNER_PASSWORD`. "Owner" in the top bar asks for the password once
+  (checked by the server, kept in that browser; click "Owner ✓" to lock). Then the Ideas page has "→ Next" on each idea
+  (cut from IDEAS.md / UNASSIGNED_IDEAS.md, added at the bottom of `## Held` with the repo's next free ID and a
+  `From I-n (date)` line) and the board has "→ Now" on each Next item (Held → bottom of Ready, spec unchanged). Each
+  click is one commit on the repo's default branch; if the branch moved meanwhile it reads again and retries, never
+  forces. Nothing ever goes into Built. Without both env vars the site shows no buttons and /api/move answers 503.
+  Tests: unit (text edits, ID numbering, CRLF kept, refusals), API against an in-memory GitHub (password, one commit,
+  retry on a moved branch, unassigned → repo, token never in answers), UI and e2e (hidden until unlocked, wrong
+  password, both moves, lock), and a live check that /api/move refuses without the password. ~8 min by the clock;
+  full local suite ~0.4 min (23 s).
+
+**Decided without the spec saying**: an unassigned idea gets a repo picker next to its button ("that repo" has no
+answer otherwise); the idea's date goes on the From line; the next ID is one more than the highest of the repo's
+prefix in FEATURE_BACKLOG.md or BUILT.md, and a repo with no IDs yet is refused rather than given an invented prefix;
+an unassigned move is two commits (target repo first, so a failure leaves the idea in both places, never lost, and
+says so).
+
+**Blocked**: none. **Ideas added**: none.
+
+**You must do by hand** (needs your logins): create the fine-grained token (all repos, Contents: read and write) and
+add `GITHUB_WRITE_TOKEN` and `OWNER_PASSWORD` in Vercel → backlogkit → Settings → Environment Variables, then redeploy.
+
 ## 2026-11-19 — BL-12
 
 **Built**

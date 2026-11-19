@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
 
 ## 2026-11-19
+- BL-11 — One-click moves: idea → Next (Ideas page), Next → Now (board) (v1.9.0) (took 8 min, suite 0.4 min)
+  After unlocking with the owner password (Owner, top right), each idea has "→ Next" (unassigned ones pick a repo first) and each Next item "→ Now"; each click is one commit to that repo on GitHub.
 - BL-12 — Board redesign: ideas off the board, Now first, readable titles (v1.8.0) (took 5 min, suite 0.4 min)
   The board is now Now, Next and Built stacked full width with no ideas on it; titles wrap in full, repos are colour dots, and Built is one line of per-repo counts until you click it.
 - BL-9 — Board home page: Later → Next → Now → Built, across all repos (v1.7.0) (took 6 min, suite 0.3 min)

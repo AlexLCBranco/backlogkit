@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // The pages, rendered from mocked GitHub data (the same loadAll the function runs).
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { OwnerContext, applyMove, type MoveRequest, type Owner } from '../src/owner';
 import { loadAll } from '../lib/github.mjs';
 import { View, parseHash, titleOf, cardTooltip } from '../src/App';
 import { FILTER_STORAGE_KEY, boardItems, builtCounts, builtCutoff, builtGroups, matches, repoColor } from '../src/board';
@@ -277,5 +278,73 @@ describe('the token', () => {
       expect(container.innerHTML).not.toContain('SECRET-TOKEN-XYZ');
       unmount();
     }
+  });
+});
+
+describe('one-click moves (BL-11)', () => {
+  const owner = (over: Partial<Owner> = {}) => {
+    const moves: MoveRequest[] = [];
+    const o: Owner = { canMove: true, unlocked: true, move: async (r) => (moves.push(r), null), unlock: async () => null, lock: () => {}, ...over };
+    return { o, moves };
+  };
+  const showAs = (o: Owner, hash: string) => {
+    const { route, q } = parseHash(hash);
+    return render(
+      <OwnerContext.Provider value={o}>
+        <View data={data} route={route} q={q} go={() => {}} now={NOW} />
+      </OwnerContext.Provider>,
+    );
+  };
+
+  it('shows no move buttons unless the owner unlocked them (and never by default)', () => {
+    show('#/');
+    show('#/ideas');
+    expect(screen.queryAllByTestId('move')).toEqual([]);
+    cleanup();
+    showAs(owner({ unlocked: false }).o, '#/ideas');
+    expect(screen.queryAllByTestId('move')).toEqual([]);
+  });
+
+  it('board: "→ Now" on each Next item only, sending a Held → Ready move without opening the row', async () => {
+    const { o, moves } = owner();
+    showAs(o, '#/');
+    expect(within(col('now')).queryAllByTestId('move')).toEqual([]);
+    const buttons = within(col('next')).getAllByTestId('move');
+    expect(buttons.map((b) => b.textContent)).toEqual(['→ Now', '→ Now']); // DM-3, OT-11
+    fireEvent.click(buttons[0]!);
+    await waitFor(() => expect(moves).toEqual([{ action: 'ready', repo: 'demo', id: 'DM-3' }]));
+    expect(buttons[0]!.closest('details')!.open).toBe(false);
+  });
+
+  it('Ideas page: "→ Next" on repo ideas; an unassigned idea needs a repo picked first', async () => {
+    const { o, moves } = owner();
+    showAs(o, '#/ideas');
+    const demoIdeas = within(screen.getByTestId('ideas-demo')).getAllByTestId('move');
+    expect(demoIdeas.map((b) => b.textContent)).toEqual(['→ Next', '→ Next']);
+    fireEvent.click(demoIdeas[1]!);
+    await waitFor(() => expect(moves).toEqual([{ action: 'idea', repo: 'demo', id: 'I-2' }]));
+
+    const un = screen.getByTestId('ideas-unassigned');
+    const btn = within(un).getByTestId('move') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    const pick = within(un).getByTestId('move-to') as HTMLSelectElement;
+    expect([...pick.options].map((x) => x.value)).toEqual(['', 'demo', 'other']); // repos with a FEATURE_BACKLOG.md
+    fireEvent.change(pick, { target: { value: 'other' } });
+    fireEvent.click(btn);
+    await waitFor(() => expect(moves[1]).toEqual({ action: 'idea', repo: 'other', id: 'U-1', from: 'unassigned' }));
+  });
+
+  it("shows the server's reason next to the button when a move fails", async () => {
+    showAs(owner({ move: async () => 'DM-3 is not under Held (moved already?)' }).o, '#/');
+    fireEvent.click(within(col('next')).getAllByTestId('move')[0]!);
+    expect(await screen.findByTestId('move-error')).toHaveProperty('textContent', 'DM-3 is not under Held (moved already?)');
+  });
+
+  it("applyMove puts the answer's lists into the page data", () => {
+    const planned = [{ name: 'Ready', kind: 'ready' as const, items: [] }];
+    const next = applyMove(data, { updates: [{ repo: 'demo', planned, ideas: [], counts: { ready: 0, held: 0, planned: 0, blocked: 0, ideas: 0 } }], unassigned: [] });
+    expect(next.projects.find((p) => p.repo === 'demo')!.planned).toBe(planned);
+    expect(next.projects.find((p) => p.repo === 'other')).toBe(data.projects.find((p) => p.repo === 'other'));
+    expect(next.unassigned.ideas).toEqual([]);
   });
 });

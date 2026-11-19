@@ -3,6 +3,7 @@
 // function instance and at Vercel's edge (s-maxage), so a burst of visits makes one round of GitHub requests.
 
 import { loadAll } from '../lib/github.mjs';
+import { movesEnabled } from './move';
 
 const TTL_MS = 60_000;
 let cache: { at: number; body: string } | null = null;
@@ -16,7 +17,7 @@ export async function GET(): Promise<Response> {
   if (cache && Date.now() - cache.at < TTL_MS) return new Response(cache.body, { headers });
   const token = process.env.GITHUB_TOKEN?.trim() || undefined;
   try {
-    let body = JSON.stringify(await loadAll({ token }));
+    let body = JSON.stringify({ ...(await loadAll({ token })), canMove: movesEnabled() });
     if (token && body.includes(token)) body = body.split(token).join('***'); // belt and braces: never send the token
     cache = { at: Date.now(), body };
     return new Response(body, { headers });

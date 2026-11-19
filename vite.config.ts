@@ -29,6 +29,15 @@ const api: Plugin = {
       res.setHeader('content-type', 'application/json');
       res.end(await r.text());
     });
+    server.middlewares.use('/api/move', async (req, res) => {
+      const { POST } = await server.ssrLoadModule('/api/move.ts');
+      const chunks: Buffer[] = [];
+      for await (const c of req) chunks.push(c as Buffer);
+      const r: Response = await POST(new Request('http://localhost/api/move', { method: req.method, headers: req.headers as Record<string, string>, body: req.method === 'POST' ? Buffer.concat(chunks) : undefined }));
+      res.statusCode = r.status;
+      res.setHeader('content-type', 'application/json');
+      res.end(await r.text());
+    });
   },
 };
 

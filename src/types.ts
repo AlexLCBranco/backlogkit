@@ -34,4 +34,6 @@ export interface Data {
   /** UNASSIGNED_IDEAS.md in this repo (BL-7): file = it exists. */
   unassigned: { file: boolean; ideas: Idea[] };
   projects: Project[];
+  /** One-click moves are set up on the server (BL-11: OWNER_PASSWORD and GITHUB_WRITE_TOKEN). */
+  canMove?: boolean;
 }

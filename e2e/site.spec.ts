@@ -3,6 +3,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fixtureData } from './fixture-data';
+import { BACKLOG, BUILT, IDEAS } from '../tests/fixtures';
+import { heldToReady, ideaToHeld } from '../lib/moves.mjs';
+import { counts, parseBacklog, parseIdeas } from '../lib/lists.mjs';
 
 const live = !!process.env.LIVE_URL;
 const pkgVersion = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
@@ -292,6 +295,72 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('all-built')).not.toContainText('(took');
   });
 
+  test('one-click moves: hidden until the owner unlocks; → Now and → Next move items and stay unlocked (BL-11)', async ({ page }) => {
+    // Moves off (the server has no OWNER_PASSWORD / GITHUB_WRITE_TOKEN): no Owner button, no move buttons.
+    await page.goto('/');
+    await expect(page.getByTestId('col-now')).toBeVisible();
+    await expect(page.getByTestId('owner')).toHaveCount(0);
+    await expect(page.getByTestId('move')).toHaveCount(0);
+
+    // Moves on: /api/move answered here with the real text edits; the password is checked like the server does.
+    const data = { ...(await fixtureData()), canMove: true };
+    const sent: unknown[] = [];
+    let backlog = BACKLOG;
+    let ideas = IDEAS;
+    // GitHub's state as it is now (after the moves so far).
+    await page.route('**/api/projects', (r) => {
+      const planned = parseBacklog(backlog);
+      const list = parseIdeas(ideas);
+      r.fulfill({ json: { ...data, projects: data.projects.map((p) => (p.repo === 'demo' ? { ...p, planned, ideas: list, counts: counts(planned, list) } : p)) } });
+    });
+    await page.route('**/api/move', async (r) => {
+      if (r.request().headers()['x-owner-password'] !== 'pw-e2e') return r.fulfill({ status: 401, json: { error: 'Wrong owner password' } });
+      const body = r.request().postDataJSON();
+      if (body.action === 'check') return r.fulfill({ json: { ok: true } });
+      sent.push(body);
+      if (body.action === 'ready') backlog = heldToReady({ backlog, id: body.id }).backlog;
+      else ({ ideas, backlog } = ideaToHeld({ ideasText: ideas, ideaId: body.id, backlog, built: BUILT }));
+      const planned = parseBacklog(backlog);
+      const list = parseIdeas(ideas);
+      return r.fulfill({ json: { ok: true, message: 'ok', updates: [{ repo: 'demo', planned, ideas: list, counts: counts(planned, list) }] } });
+    });
+    await page.reload();
+    await expect(page.getByTestId('move')).toHaveCount(0); // not unlocked yet
+    await page.getByTestId('owner').click();
+    await page.getByLabel('Owner password').fill('wrong');
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await expect(page.getByTestId('owner-form').getByRole('alert')).toHaveText('Wrong owner password');
+    await page.getByLabel('Owner password').fill('pw-e2e');
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await expect(page.getByTestId('owner')).toHaveText('Owner ✓');
+
+    await expect(page.getByTestId('col-now').getByTestId('move')).toHaveCount(0);
+    const next = page.getByTestId('col-next');
+    await next.getByRole('button', { name: /Move DM-3 to Now/ }).click();
+    await expect.poll(() => lines(page, 'now')).toContain('DM-3Later thing');
+    expect(await lines(page, 'next')).toEqual([]);
+    await expect(next).toContainText('Nothing here');
+
+    await page.reload(); // still unlocked in this browser
+    await page.goto('/#/ideas');
+    const demoIdeas = page.getByTestId('ideas-demo');
+    await demoIdeas.getByRole('button', { name: /Move I-1 to Next/ }).click();
+    await expect(demoIdeas.getByTestId('idea')).toHaveCount(1);
+    await expect(demoIdeas).not.toContainText('Dark mode toggle');
+    await page.goto('/');
+    await expect.poll(() => lines(page, 'next')).toEqual(['DM-6Dark mode toggle→ Now']);
+    expect(sent).toEqual([{ action: 'ready', repo: 'demo', id: 'DM-3' }, { action: 'idea', repo: 'demo', id: 'I-1' }]);
+
+    // Lock: buttons gone, and gone after a reload too.
+    await page.getByTestId('owner').click();
+    await expect(page.getByTestId('owner')).toHaveText('Owner');
+    await expect(page.getByTestId('move')).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId('col-next').getByTestId('board-item')).toHaveCount(1);
+    await expect(page.getByTestId('owner')).toHaveText('Owner');
+    await expect(page.getByTestId('move')).toHaveCount(0);
+  });
+
   test('the token never reaches the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('col-now')).toBeVisible();
@@ -342,4 +411,13 @@ test('live: real projects load from GitHub', async ({ page }) => {
   await page.getByTestId('card-backlogkit').click({ position: { x: 200, y: 50 } });
   await expect(page.getByRole('group', { name: 'Filter by project' }).getByRole('button', { name: 'backlogkit', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('group', { name: 'Filter by project' }).getByRole('button', { name: 'All' }).click(); // leave no filter behind
+});
+
+test('live: moves are protected: no password, or a wrong one, writes nothing (BL-11)', async ({ request }) => {
+  test.skip(!live, 'live only');
+  const body = { action: 'ready', repo: 'backlogkit', id: 'BL-1' };
+  const none = await request.post('/api/move', { data: body });
+  expect([401, 503]).toContain(none.status()); // 503: moves not set up yet
+  const wrong = await request.post('/api/move', { data: body, headers: { 'x-owner-password': 'not-the-password' } });
+  expect([401, 503]).toContain(wrong.status());
 });

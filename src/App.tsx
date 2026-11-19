@@ -7,6 +7,7 @@ import type { Data, Estimate, Idea, Project } from './types';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
+import { MoveButton, OwnerContext, OwnerControl, useOwner, useOwnerState } from './owner';
 import { SORT_OPTIONS, loadSort, saveSort, sortProjects, type SortKey } from './sort';
 import { estimateTotal, formatDuration, ideaMarkdown } from '../lib/lists.mjs';
 import {
@@ -214,6 +215,7 @@ function BoardLine({ item, first, dot }: { item: BoardItem; first: boolean; dot:
         {item.id && <span className="id">{item.id}</span>}
         <span className="title">{item.title}</span>
         {item.blocked && <span className="badge blocked">Blocked</span>}
+        {item.column === 'next' && item.id && <MoveButton label="→ Now" title={`Move ${item.id} to Now (Held → Ready in ${item.repo})`} req={{ action: 'ready', repo: item.repo, id: item.id }} />}
         <CopyButton text={item.markdown} label={label} />
       </summary>
       <div className="body">
@@ -362,13 +364,33 @@ export function BuiltPage({ data }: { data: Data }) {
   );
 }
 
-function IdeaList({ ideas }: { ideas: Idea[] }) {
+/** An unassigned idea's move: pick the repo it goes to, then → Next (BL-11). */
+function UnassignedMove({ idea, targets }: { idea: Idea; targets: string[] }) {
+  const [to, setTo] = useState('');
+  if (!useOwner().unlocked) return null;
+  return (
+    <>
+      <select className="move-to" aria-label={`Repo for ${idea.id}`} value={to} onChange={(e) => setTo(e.target.value)} data-testid="move-to">
+        <option value="">to repo…</option>
+        {targets.map((t) => (
+          <option key={t} value={t}>{t}</option>
+        ))}
+      </select>
+      <MoveButton label="→ Next" title={`Move ${idea.id} to Next (Held) in ${to || 'the chosen repo'}`} req={to ? { action: 'idea', repo: to, id: idea.id!, from: 'unassigned' } : null} />
+    </>
+  );
+}
+
+/** repo: whose IDEAS.md this is (with a FEATURE_BACKLOG.md to move into), or 'unassigned' with the repos to pick from. */
+function IdeaList({ ideas, repo, targets = [] }: { ideas: Idea[]; repo?: string | 'unassigned'; targets?: string[] }) {
   return (
     <ul className="idea-list">
       {ideas.map((i, n) => (
         <li key={`${i.id ?? ''}-${n}`} data-testid="idea">
           {i.id && <span className="id">{i.id}</span>} {i.title}
           <CopyButton text={ideaMarkdown(i)} label={`Copy ${i.id ?? i.title}`} />
+          {i.id && repo === 'unassigned' && <UnassignedMove idea={i} targets={targets} />}
+          {i.id && repo && repo !== 'unassigned' && <MoveButton label="→ Next" title={`Move ${i.id} to Next (Held in ${repo})`} req={{ action: 'idea', repo, id: i.id }} />}
         </li>
       ))}
     </ul>
@@ -381,6 +403,7 @@ const ideasMarkdown = (ideas: Idea[]) => ideas.map(ideaMarkdown).join('\n') + '\
 export function IdeasPage({ data }: { data: Data }) {
   const withIdeas = data.projects.filter((p) => p.ideas.length);
   const un = data.unassigned;
+  const targets = data.projects.filter((p) => p.files.backlog).map((p) => p.repo).sort((a, b) => a.localeCompare(b));
   return (
     <div className="ideas-page">
       <section className="repo-block" data-testid="ideas-unassigned">
@@ -388,7 +411,7 @@ export function IdeasPage({ data }: { data: Data }) {
           Unassigned <span className="muted">{un.ideas.length}</span>{' '}
           {un.ideas.length > 0 && <CopyButton text={ideasMarkdown(un.ideas)} label="Copy all Unassigned ideas" />}
         </h3>
-        {un.ideas.length ? <IdeaList ideas={un.ideas} /> : <p className="muted">{un.file ? 'No unassigned ideas.' : 'No UNASSIGNED_IDEAS.md.'}</p>}
+        {un.ideas.length ? <IdeaList ideas={un.ideas} repo="unassigned" targets={targets} /> : <p className="muted">{un.file ? 'No unassigned ideas.' : 'No UNASSIGNED_IDEAS.md.'}</p>}
       </section>
       {withIdeas.map((p) => (
         <section key={p.repo} className="repo-block" data-testid={`ideas-${p.repo}`}>
@@ -396,7 +419,7 @@ export function IdeasPage({ data }: { data: Data }) {
             <a href={hrefOf({ page: 'board', only: p.repo })}>{p.repo}</a> <span className="muted">{p.ideas.length}</span>{' '}
             <CopyButton text={ideasMarkdown(p.ideas)} label={`Copy all ${p.repo} ideas`} />
           </h3>
-          <IdeaList ideas={p.ideas} />
+          <IdeaList ideas={p.ideas} repo={p.files.backlog ? p.repo : undefined} />
         </section>
       ))}
     </div>
@@ -432,6 +455,7 @@ export function App() {
   const [{ route, q }, setState] = useState(() => parseHash(location.hash));
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const owner = useOwnerState(data, setData);
 
   useEffect(() => {
     const on = () => setState(parseHash(location.hash));
@@ -474,7 +498,7 @@ export function App() {
   const onBoard = route.page === 'board' || !!q;
 
   return (
-    <>
+    <OwnerContext.Provider value={owner}>
       <nav className="topbar">
         <a className="brand" href="#/" onClick={() => setQ('')}>
           <img src="/logo.svg" alt="" width="20" height="20" data-testid="logo" /> backlogkit
@@ -484,6 +508,7 @@ export function App() {
         <a href="#/ideas" className={route.page === 'ideas' && !q ? 'on' : ''}>Ideas</a>
         <input type="search" placeholder="Search the board by text or ID…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
         {data && <span className="muted stamp" title={`Read from GitHub at ${data.generatedAt}`}>read {new Date(data.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
+        <OwnerControl />
       </nav>
       <main>
         {error && <p className="error banner" role="alert">Could not load projects: {error}</p>}
@@ -496,6 +521,6 @@ export function App() {
         )}
       </main>
       <SiteVersion {...BUILD_INFO} />
-    </>
+    </OwnerContext.Provider>
   );
 }
