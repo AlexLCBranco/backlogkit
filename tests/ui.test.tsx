@@ -4,8 +4,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { OwnerContext, applyMove, type MoveRequest, type Owner } from '../src/owner';
 import { loadAll } from '../lib/github.mjs';
-import { View, parseHash, titleOf, cardTooltip } from '../src/App';
-import { SEEN_STORAGE_KEY, doneKey, loadSeen, markSeen, newCutoff, newDone, saveSeen, FILTER_STORAGE_KEY, LANES, boardIdeas, boardItems, builtCutoff, builtGroups, ideaMatches, laneCounts, laneOf, matches } from '../src/board';
+import { useState } from 'react';
+import { View, cardTooltip } from '../src/App';
+import { hrefOf, parseHash, titleOf, type Nav } from '../src/nav';
+import { SEEN_STORAGE_KEY, doneKey, loadSeen, markSeen, newCutoff, newDone, saveSeen, LANES, boardIdeas, boardItems, builtCutoff, builtGroups, ideaMatches, laneCounts, laneOf, matches } from '../src/board';
 import type { Data } from '../src/types';
 import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from './fixtures';
 
@@ -27,10 +29,15 @@ beforeEach(() => localStorage.clear());
 afterEach(cleanup);
 
 const NOW = new Date(2026, 10, 19, 12); // 2026-11-19, local time
-const show = (hash: string, now = NOW) => {
-  const { route, q } = parseHash(hash);
-  return render(<View data={data} route={route} q={q} go={() => {}} now={now} />);
-};
+/** The pages with their state held as the app holds it (the address); `address()` is what the address bar would say. */
+let shownHref = '';
+function Harness({ d, hash, now }: { d: Data; hash: string; now?: Date }) {
+  const [nav, setNav] = useState<Nav>(() => parseHash(hash));
+  shownHref = hrefOf(nav);
+  return <View data={d} nav={nav} go={(n) => setNav(parseHash(hrefOf(n)))} now={now} />;
+}
+const address = () => shownHref;
+const show = (hash: string, now = NOW) => render(<Harness d={data} hash={hash} now={now} />);
 const lane = (key: string) => screen.getByTestId(`lane-${key}`);
 // A row as "label | sentence | ID"; a sentence ending in * has the "no summary yet" tag (BL-15).
 const row = (s: Element) => {
@@ -180,16 +187,16 @@ describe('home page: five lanes (BL-14)', () => {
     expect(screen.queryByTestId('estimate-total')).toBeNull();
     expect(document.body.textContent).not.toContain('no estimates yet');
   });
-  it('project chips (All projects first) filter the lanes and the strip, and are remembered', () => {
+  it('project chips (All projects first) filter the lanes and the strip, and live in the address (BL-19)', () => {
     show('#/');
     const chips = within(screen.getByRole('group', { name: 'Filter by project' })).getAllByRole('button');
     expect(chips[0]!.textContent).toBe('All projects');
     fireEvent.click(screen.getByRole('button', { name: 'other' }));
     expect(heads()).toEqual(['Stuck – needs you 1', 'Will be built next 1', 'Waiting for your OK 0', 'Ideas 0', 'Done 1']); // unassigned ideas only under All
     expect(strip()).toEqual(['1', '1', '0', '0', '1']);
-    expect(JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY)!)).toEqual(['other']);
+    expect(address()).toBe('#/?p=other');
     cleanup();
-    show('#/');
+    show('#/?p=other');
     expect(screen.getByRole('button', { name: 'other' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'demo' }));
     expect(heads()).toEqual(['Stuck – needs you 2', 'Will be built next 2', 'Waiting for your OK 1', 'Ideas 2', 'Done 5']);
@@ -198,12 +205,11 @@ describe('home page: five lanes (BL-14)', () => {
     expect(heads()).toEqual(ALL_HEADS);
   });
   it('an old project URL opens the home page filtered to that project (any spelling)', () => {
-    expect(parseHash('#/p/demo').route).toEqual({ page: 'board', only: 'demo' });
-    expect(parseHash('#/all').route).toEqual({ page: 'board' });
+    expect(parseHash('#/p/demo')).toMatchObject({ page: 'board', p: ['demo'] });
+    expect(parseHash('#/all')).toMatchObject({ page: 'board', p: [] });
     show('#/p/OTHER');
     expect(screen.getByRole('button', { name: 'other' }).getAttribute('aria-pressed')).toBe('true');
     expect(lines('next')).toEqual(['other | Other gets ten. | OT-10']);
-    expect(JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY)!)).toEqual(['other']);
   });
   it('one vocabulary: none of Now, Next, Ready, Held or Planned as a label on any page', () => {
     for (const hash of ['#/', '#/projects', '#/ideas', '#/built']) {
@@ -306,7 +312,7 @@ describe('projects page (BL-10 compact cards)', () => {
   });
   it('the card links to the board filtered to it', () => {
     show('#/projects');
-    expect(within(screen.getByTestId('card-demo')).getByRole('link', { name: 'demo' }).getAttribute('href')).toBe('#/p/demo');
+    expect(within(screen.getByTestId('card-demo')).getByRole('link', { name: 'demo' }).getAttribute('href')).toBe('#/?p=demo');
   });
   it('an unreadable repo shows its reason', () => {
     show('#/projects');
@@ -343,8 +349,8 @@ describe('ideas page (BL-7, grouped by reason in BL-17)', () => {
     expect(notes.map((n) => [n.textContent, n.className])).toEqual([['2026-11-01', 'muted idea-note'], ['2026-11-02', 'muted idea-note']]);
   });
   it('#/ideas/<group> opens that group (Maybe never unfolds)', () => {
-    expect(parseHash('#/ideas/never').route).toEqual({ page: 'ideas', group: 'never' });
-    expect(parseHash('#/ideas/bogus').route).toEqual({ page: 'ideas' });
+    expect(parseHash('#/ideas/never')).toMatchObject({ page: 'ideas', group: 'never' });
+    expect(parseHash('#/ideas/bogus')).not.toHaveProperty('group');
     show('#/ideas/never');
     expect((screen.getByTestId('why-never') as HTMLDetailsElement).open).toBe(true);
   });
@@ -352,11 +358,11 @@ describe('ideas page (BL-7, grouped by reason in BL-17)', () => {
 
 describe('tab title', () => {
   it('names what is open', () => {
-    expect(titleOf({ page: 'board' })).toBe('backlogkit · Home');
-    expect(titleOf({ page: 'projects' })).toBe('backlogkit · Projects');
-    expect(titleOf({ page: 'ideas' })).toBe('backlogkit · Ideas');
-    expect(titleOf({ page: 'built' })).toBe('backlogkit · Built');
-    expect(titleOf({ page: 'projects' }, '  dark ')).toBe('backlogkit · search “dark”');
+    expect(titleOf(parseHash('#/'))).toBe('backlogkit · Home');
+    expect(titleOf(parseHash('#/projects'))).toBe('backlogkit · Projects');
+    expect(titleOf(parseHash('#/ideas'))).toBe('backlogkit · Ideas');
+    expect(titleOf(parseHash('#/built'))).toBe('backlogkit · Built');
+    expect(titleOf(parseHash('#/projects?q=%20%20dark%20'))).toBe('backlogkit · search “dark”');
   });
 });
 
@@ -365,7 +371,7 @@ describe('the token', () => {
     const { fetchImpl } = mockGithub({ repos: [{ name: 'demo' }], files: { demo: { 'BUILT.md': BUILT } }, fails: {}, projectsJson: projectsJson([{ repo: 'demo' }, { repo: 'gone' }]) });
     const d = (await loadAll({ token: 'SECRET-TOKEN-XYZ', fetchImpl })) as Data;
     for (const hash of ['#/', '#/projects', '#/built', '#/ideas', '#/?q=a']) {
-      const { container, unmount } = render(<View data={d} {...parseHash(hash)} go={() => {}} />);
+      const { container, unmount } = render(<Harness d={d} hash={hash} />);
       expect(container.innerHTML).not.toContain('SECRET-TOKEN-XYZ');
       unmount();
     }
@@ -378,14 +384,12 @@ describe('one-click moves (BL-11)', () => {
     const o: Owner = { canMove: true, unlocked: true, move: async (r) => (moves.push(r), null), unlock: async () => null, lock: () => {}, ...over };
     return { o, moves };
   };
-  const showAs = (o: Owner, hash: string) => {
-    const { route, q } = parseHash(hash);
-    return render(
+  const showAs = (o: Owner, hash: string) =>
+    render(
       <OwnerContext.Provider value={o}>
-        <View data={data} route={route} q={q} go={() => {}} now={NOW} />
+        <Harness d={data} hash={hash} now={NOW} />
       </OwnerContext.Provider>,
     );
-  };
 
   it('shows no move buttons unless the owner unlocked them (and never by default)', () => {
     show('#/');

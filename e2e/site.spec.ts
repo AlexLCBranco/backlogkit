@@ -23,6 +23,12 @@ const lines = (page: Page, lane: string) =>
   );
 const heads = (page: Page) => page.locator('[data-testid^="lane-"] > h2').allTextContents();
 const stripNumbers = (page: Page) => page.getByTestId('strip').locator('b').allTextContents();
+/** "Go anywhere" (Ctrl+K), type, and pick "Search everything for …". */
+export async function searchAll(page: Page, words: string) {
+  await page.keyboard.press('Control+k');
+  await page.getByTestId('go-input').fill(words);
+  await page.getByTestId('go-item').filter({ hasText: `Search everything for “${words}”` }).click();
+}
 const LANE_KEYS = ['stuck', 'next', 'waiting', 'ideas', 'done'];
 const ALL_HEADS = ['Stuck – needs you 1', 'Will be built next 4', 'Waiting for your OK 1', 'Ideas 3', 'Done 4'];
 const LONG = 'A very long title that keeps going well past the width of a narrow window so it has to wrap onto a second line';
@@ -157,7 +163,7 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('all-built-day').last()).toContainText('ZU-1');
   });
 
-  test('project chips: All projects first, at least 32 px tall, filter lanes and strip, remembered; cards and old URLs open it filtered', async ({ page }) => {
+  test('project chips: All projects first, at least 32 px tall, filter lanes and strip, kept in the address; cards and old URLs open it filtered', async ({ page }) => {
     await page.goto('/');
     const chips = page.getByRole('group', { name: 'Filter by project' }).getByRole('button');
     await expect(chips).toHaveText(['All projects', 'alpha', 'demo', 'zulu', 'broken']); // card sort order
@@ -165,9 +171,10 @@ test.describe('mocked GitHub', () => {
     const fill = (name: string) => chips.filter({ hasText: name }).evaluate((e) => getComputedStyle(e).backgroundColor);
     const off = await fill('alpha');
     await chips.filter({ hasText: 'alpha' }).click();
-    expect(await fill('alpha')).not.toBe(off);
+    await expect.poll(() => fill('alpha')).not.toBe(off);
     expect(await heads(page)).toEqual(['Stuck – needs you 0', 'Will be built next 2', 'Waiting for your OK 0', 'Ideas 0', 'Done 0']);
     expect(await stripNumbers(page)).toEqual(['0', '2', '0', '0', '0']);
+    await expect(page).toHaveURL(/#\/\?p=alpha$/);
     await page.reload();
     await expect(chips.filter({ hasText: 'alpha' })).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(() => stripNumbers(page)).toEqual(['0', '2', '0', '0', '0']);
@@ -177,12 +184,12 @@ test.describe('mocked GitHub', () => {
     await page.getByRole('link', { name: 'Projects', exact: true }).click();
     await expect(page).toHaveTitle('backlogkit · Projects');
     await page.getByTestId('card-demo').click({ position: { x: 200, y: 50 } });
-    await expect(page).toHaveURL(/#\/$/);
+    await expect(page).toHaveURL(/#\/\?p=demo$/);
     await expect(chips.filter({ hasText: 'demo' })).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(() => heads(page)).toEqual(['Stuck – needs you 1', 'Will be built next 1', 'Waiting for your OK 1', 'Ideas 2', 'Done 4']);
 
     await page.goto('/#/p/ZULU'); // an old project-page URL, any spelling
-    await expect(page).toHaveURL(/#\/$/);
+    await expect(page).toHaveURL(/#\/\?p=zulu$/);
     await expect(chips.filter({ hasText: 'zulu' })).toHaveAttribute('aria-pressed', 'true');
     await page.goto('/#/all'); // the old All repos view
     await expect(page.getByTestId('lane-next')).toBeVisible();
@@ -208,11 +215,12 @@ test.describe('mocked GitHub', () => {
     expect(await clipboard()).toBe('- DM-5 — Newest thing (v1.3.0)\n  What the owner sees now.');
   });
 
-  test('search: "Search everything…" from any page searches every lane and the ideas', async ({ page }) => {
+  test('search: "Go anywhere" → Search everything, from any page, searches every lane and the ideas', async ({ page }) => {
     await page.goto('/#/projects');
+    await expect(page.getByTestId('card-demo')).toBeVisible();
+    await searchAll(page, 'DM-5');
     const box = page.getByRole('searchbox', { name: 'Search' });
-    await expect(box).toHaveAttribute('placeholder', 'Search everything…');
-    await box.fill('DM-5');
+    await expect(box).toHaveValue('DM-5');
     await expect(page).toHaveTitle('backlogkit · search “DM-5”');
     await expect(page.getByTestId('board-item')).toHaveCount(1);
     await expect(page.getByTestId('lane-done')).toContainText('Newest thing');
@@ -221,9 +229,11 @@ test.describe('mocked GitHub', () => {
     await box.fill('thing');
     await expect.poll(() => heads(page)).toEqual(['Stuck – needs you 1', 'Will be built next 1', 'Waiting for your OK 1', 'Ideas 1', 'Done 3']); // "Something long" is an idea; ZU-1 is older than 7 days
     await page.goto('/#/ideas');
-    await box.fill('orphan'); // an idea
+    await expect(page.getByTestId('why-decision')).toBeVisible();
+    await searchAll(page, 'orphan'); // an idea
     await expect(page.getByTestId('lane-ideas').getByTestId('idea')).toHaveText(['Unassigned U-1 Orphan gadget for no repo']);
-    await box.fill('');
+    await page.getByTestId('search-clear').click();
+    await expect(page).toHaveTitle('backlogkit · Home');
     await expect.poll(() => heads(page)).toEqual(ALL_HEADS);
   });
 
@@ -264,25 +274,33 @@ test.describe('mocked GitHub', () => {
     await expect(alpha).toHaveAttribute('title', 'Suite time: —\nEstimated: build ~5 min · suite ~1 min (1 of 2 items estimated)');
   });
 
-  test('sort dropdown reorders the cards in each group and survives a reload', async ({ page }) => {
+  test('sort switches (How) reorder the cards in each group; the order is in the address and survives a reload', async ({ page }) => {
     await page.goto('/#/projects');
     const active = page.getByTestId('group-active');
     const names = () => active.locator('.card').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')!.slice(5)));
-    const sort = page.getByRole('combobox', { name: 'Sort projects' });
-    await expect(sort).toHaveValue('backlog-desc'); // default
+    const field = page.getByRole('radiogroup', { name: 'Sort projects by' });
+    const dir = page.getByRole('radiogroup', { name: 'Sort direction' });
+    await expect(field.getByRole('radio', { name: 'Backlog changed' })).toHaveAttribute('aria-checked', 'true'); // default
+    await expect(dir.getByRole('radio', { name: 'Newest first' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page).toHaveURL(/#\/projects\?sort=backlog-desc$/);
     await expect.poll(names).toEqual(['alpha', 'demo', 'zulu', 'broken']); // unknown date (broken) last
 
-    await sort.selectOption('name-desc');
+    await field.getByRole('radio', { name: 'Name' }).click();
+    await expect.poll(names).toEqual(['alpha', 'broken', 'demo', 'zulu']); // A–Z
+    await dir.getByRole('radio', { name: 'Z–A' }).click();
     await expect.poll(names).toEqual(['zulu', 'demo', 'broken', 'alpha']);
-    await sort.selectOption({ label: 'Created — oldest first' });
+    await field.getByRole('radio', { name: 'Created' }).click();
+    await dir.getByRole('radio', { name: 'Oldest first' }).click();
     await expect.poll(names).toEqual(['alpha', 'demo', 'broken', 'zulu']); // broken: the mock's default 2026-01-01
-    await sort.selectOption('backlog-asc');
+    await field.getByRole('radio', { name: 'Backlog changed' }).click();
+    await dir.getByRole('radio', { name: 'Oldest first' }).click();
     await expect.poll(names).toEqual(['zulu', 'demo', 'alpha', 'broken']);
+    await expect(page).toHaveURL(/#\/projects\?sort=backlog-asc$/);
 
     await page.reload();
-    await expect(page.getByRole('combobox', { name: 'Sort projects' })).toHaveValue('backlog-asc');
+    await expect(dir.getByRole('radio', { name: 'Oldest first' })).toHaveAttribute('aria-checked', 'true');
     await expect.poll(names).toEqual(['zulu', 'demo', 'alpha', 'broken']);
-    await page.getByRole('link', { name: 'Home' }).click(); // the home page groups by the same order
+    await page.getByRole('link', { name: 'Home', exact: true }).click(); // the home page groups by the same order
     await expect(page.getByRole('group', { name: 'Filter by project' }).getByRole('button')).toHaveText(['All projects', 'zulu', 'demo', 'alpha', 'broken']);
   });
 
@@ -295,7 +313,7 @@ test.describe('mocked GitHub', () => {
     await expect(page).toHaveTitle('backlogkit · Ideas');
     await page.goto('/#/built');
     await expect(page).toHaveTitle('backlogkit · Built');
-    await page.getByRole('searchbox', { name: 'Search' }).fill('thing');
+    await searchAll(page, 'thing');
     await expect(page).toHaveTitle('backlogkit · search “thing”');
   });
 

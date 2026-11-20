@@ -2,6 +2,35 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-20 — BL-19
+
+**Built**
+- BL-19 — Shared layout (v1.16.0), following NAV_PATTERN.md with footykit FK-65's header styles copied (FK-65 had
+  shipped). Pinned header on every page: logo, ← → (this tab's own trail, with "Back to …" tooltips), breadcrumb
+  (each part opens its neighbours), "Go anywhere" (Ctrl+K: pages, projects, idea groups, any item or idea by ID, or
+  "Search everything for …"), the read time and Owner button. Accent colour now footykit's blue.
+- **Where mapping (please check):** Home (all backlogs, the five lanes) · Projects · Ideas · Built. There is no
+  Reports page on the site, so no tab for it.
+- **What / How:** the project chips are the What row on Home, Ideas and Built (Ideas and Built can now be filtered by
+  project too). On Projects, the sort dropdown became two How switches: Backlog changed / Last change / Created /
+  Name, then Newest first / Oldest first (A–Z / Z–A for Name).
+- **Every state in the address:** `#/?p=alpha,demo`, `#/ideas/later?p=demo`, `#/projects?sort=name-asc`, `#/?q=…`.
+  Old `#/p/<repo>` and `#/all` still open. Change you'll notice: the chosen projects are no longer remembered by the
+  browser separately — opening the bare address shows All projects (so a shared link always shows the same screen).
+  The sort order is still remembered for Home's grouping.
+- The old always-on search box is gone from the header (the pattern has "Go anywhere" there); a search shows an
+  editable Search field with × in the page rows.
+- Kept as dropdowns on purpose: the Ideas page's per-idea "reason" and "to repo…" pickers (owner actions, not choices
+  of what's shown).
+
+**Tests:** 169 unit + 31 e2e pass locally (suite 0.6 min). New `e2e/nav.spec.ts` covers NAV_PATTERN §6: header on
+every page, same height, pinned after scroll; every tab / chip / switch / breadcrumb part navigates and reloads to the
+same screen; ← → and browser back/forward; Go anywhere; clicks < 100 ms; layout shift < 0.01; no What dropdowns,
+every icon-only control named; 390 px fits with no sideways scroll; screenshots of each page (desktop and 390 px).
+
+**Blocked:** none. **Ideas added:** none.
+**Test by hand:** only the look — whether it reads as one site with footykit.
+
 ## 2026-11-19 — BL-14, BL-15, BL-16, BL-17, BL-18, BL-13
 
 **Built** (each its own commit and version, live after each push)

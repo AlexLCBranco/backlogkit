@@ -1,15 +1,17 @@
 // The site: Home (five lanes across all repos with a number strip on top, BL-14), Projects (one compact card each,
-// BL-10), Ideas, and Everything built; search from the top bar shows Home filtered. Routes live in the hash:
-// #/ (home), #/projects, #/ideas, #/built, plus ?q=<search>. Old #/p/<repo> URLs open Home filtered to that repo; old
-// #/all opens Home.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+// BL-10), Ideas, and Everything built, under the shared pinned header (BL-19, NAV_PATTERN.md). Every state lives in
+// the address (src/nav.ts); old #/p/<repo> and #/all addresses still open Home.
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { Header, type PageHistory } from './Header';
+import { PageRows } from './PageRows';
+import { hasProjects, hrefOf, navLabel, parseHash, resolveProjects, shownPlace, titleOf, type Nav } from './nav';
 import { SelectionBar, SelectionStyle, createSelectionStore, selectionText, useMarqueeSelection } from './selection';
 import type { Data, Estimate, Idea, Project } from './types';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
 import { MoveButton, OwnerContext, OwnerControl, useOwner, useOwnerState } from './owner';
-import { SORT_OPTIONS, loadSort, saveSort, sortProjects, type SortKey } from './sort';
+import { saveSort, sortProjects, type SortKey } from './sort';
 import { estimateTotal, formatDuration, ideaMarkdown } from '../lib/lists.mjs';
 import {
   LANES,
@@ -25,13 +27,10 @@ import {
   ideaMatches,
   inFilter,
   laneCounts,
-  loadFilter,
   matches,
   projectLaneCounts,
-  saveFilter,
   WHY_GROUPS,
   ideaGroups,
-  isWhyKey,
   planTargets,
   type BoardIdea,
   type BoardItem,
@@ -89,36 +88,26 @@ export function EstimateTotal({ items, label = 'Estimated' }: { items: { estimat
   );
 }
 
-export type Route = { page: 'board'; only?: string } | { page: 'projects' } | { page: 'ideas'; group?: WhyKey } | { page: 'built' };
-
-export function parseHash(hash: string): { route: Route; q: string } {
-  const [path = '', query = ''] = hash.replace(/^#/, '').split('?');
-  const q = new URLSearchParams(query).get('q') ?? '';
-  const parts = path.split('/').filter(Boolean);
-  if (parts[0] === 'p' && parts[1]) return { route: { page: 'board', only: decodeURIComponent(parts[1]) }, q }; // old project page
-  if (parts[0] === 'projects') return { route: { page: 'projects' }, q };
-  if (parts[0] === 'ideas') return { route: isWhyKey(parts[1]) ? { page: 'ideas', group: parts[1] } : { page: 'ideas' }, q };
-  if (parts[0] === 'built') return { route: { page: 'built' }, q };
-  return { route: { page: 'board' }, q }; // also the old #/all
+/** Internal navigation: links keep their address (open in a new tab works) but move through the app's history. */
+const GoContext = createContext<(n: Nav) => void>(() => {});
+export function NavLink({ to, className, children, testId }: { to: Nav; className?: string; children: ReactNode; testId?: string }) {
+  const go = useContext(GoContext);
+  return (
+    <a
+      href={hrefOf(to)}
+      className={className}
+      data-testid={testId}
+      onClick={(e: MouseEvent) => {
+        e.stopPropagation();
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        go(to);
+      }}
+    >
+      {children}
+    </a>
+  );
 }
-
-/** The browser tab's title for what's open (BL-6). */
-export function titleOf(route: Route, q = ''): string {
-  if (q.trim()) return `backlogkit · search “${q.trim()}”`;
-  if (route.page === 'projects') return 'backlogkit · Projects';
-  if (route.page === 'ideas') return 'backlogkit · Ideas';
-  if (route.page === 'built') return 'backlogkit · Built';
-  return 'backlogkit · Home';
-}
-
-export const hrefOf = (route: Route) =>
-  route.page === 'board'
-    ? route.only
-      ? `#/p/${encodeURIComponent(route.only)}`
-      : '#/'
-    : route.page === 'ideas' && route.group
-      ? `#/ideas/${route.group}`
-      : `#/${route.page}`;
 
 const STATUS_GROUPS: { key: string; label: string; test: (p: Project) => boolean }[] = [
   { key: 'active', label: 'Active', test: (p) => !p.noFiles && p.status === 'active' },
@@ -143,12 +132,12 @@ export function cardTooltip(p: Project): string {
   return `Suite time: ${suiteText(p) ?? DASH}\nEstimated: ${planned.length ? estimateText(planned) : DASH}`;
 }
 
-export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
+export function Card({ p, onOpen, sort }: { p: Project; onOpen?: () => void; sort: SortKey }) {
   const lanes = projectLaneCounts(p);
   return (
     <article className={`card${onOpen ? ' clickable' : ''}`} data-testid={`card-${p.repo}`} onClick={onOpen} title={cardTooltip(p)}>
       <header>
-        <h3>{onOpen ? <a href={hrefOf({ page: 'board', only: p.repo })} onClick={(e) => e.stopPropagation()}>{p.repo}</a> : p.repo}</h3>
+        <h3>{onOpen ? <NavLink to={{ page: 'board', p: [p.repo], q: '', sort }}>{p.repo}</NavLink> : p.repo}</h3>
         <span className={`status status-${p.status ?? 'none'}`}>{dash(p.status)}</span>
       </header>
       <p className="desc">{dash(p.description)}</p>
@@ -179,28 +168,10 @@ export function Card({ p, onOpen }: { p: Project; onOpen?: () => void }) {
   );
 }
 
-export function ProjectsPage({ data, go }: { data: Data; go: (r: Route) => void }) {
-  const [sort, setSort] = useState<SortKey>(loadSort);
+export function ProjectsPage({ data, nav, go }: { data: Data; nav: Nav; go: (n: Nav) => void }) {
+  const sort = nav.sort;
   return (
     <div className="home">
-      <label className="sort">
-        Sort{' '}
-        <select
-          aria-label="Sort projects"
-          value={sort}
-          onChange={(e) => {
-            const key = e.target.value as SortKey;
-            setSort(key);
-            saveSort(key);
-          }}
-        >
-          {SORT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
       {STATUS_GROUPS.map((g) => {
         const list = sortProjects(data.projects.filter(g.test), sort);
         if (!list.length) return null;
@@ -211,7 +182,7 @@ export function ProjectsPage({ data, go }: { data: Data; go: (r: Route) => void 
             </h2>
             <div className="cards">
               {list.map((p) => (
-                <Card key={p.repo} p={p} onOpen={() => go({ page: 'board', only: p.repo })} />
+                <Card key={p.repo} p={p} sort={sort} onOpen={() => go({ page: 'board', p: [p.repo], q: '', sort })} />
               ))}
             </div>
           </section>
@@ -395,30 +366,10 @@ function DoneGroup({ repo, items }: { repo: string; items: BoardItem[] }) {
 const grouped = (list: BoardItem[]) => list.map((i, n) => <BoardLine key={i.key} item={i} first={n > 0 && list[n - 1]!.repo !== i.repo} />);
 
 /**
- * The home page (BL-14): the number strip, project chips, then the five lanes in fixed order. `only` (from an old
- * project URL or a project card) selects that one project; otherwise the chips this browser remembers. While
- * searching, Done looks through every day and Ideas lists the matching ideas.
+ * The home page (BL-14): the number strip, then the five lanes in fixed order, for the projects chosen in the What
+ * chips (BL-19: in the address). While searching, Done looks through every day and Ideas lists the matching ideas.
  */
-export function Home({ data, q, only, now }: { data: Data; q: string; only?: string; now?: Date }) {
-  const sort = loadSort();
-  const projects = useMemo(() => sortProjects(data.projects.filter((p) => !p.noFiles), sort), [data, sort]);
-  const resolve = (name: string) => projects.find((p) => p.repo.toLowerCase() === name.toLowerCase())?.repo;
-  const [selected, setSelected] = useState<string[]>(() => {
-    const one = only && resolve(only);
-    return one ? [one] : loadFilter();
-  });
-  useEffect(() => {
-    const one = only && resolve(only);
-    if (one) {
-      setSelected([one]);
-      saveFilter([one]);
-    }
-  }, [only, projects]); // eslint-disable-line react-hooks/exhaustive-deps
-  const choose = (next: string[]) => {
-    setSelected(next);
-    saveFilter(next);
-  };
-  const valid = selected.filter((s) => projects.some((p) => p.repo === s));
+export function Home({ data, q, selected: valid, sort, now }: { data: Data; q: string; selected: string[]; sort: SortKey; now?: Date }) {
   const searching = !!q.trim();
   const today = now ?? new Date();
   const cutoff = newCutoff(today);
@@ -453,20 +404,6 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
       <SelectionStyle store={selection} />
       <SelectionBar store={selection} text={copyText} />
       <NumberStrip counts={counts} />
-      <div className="chips" role="group" aria-label="Filter by project" data-no-marquee>
-        <button type="button" className="chip" aria-pressed={!valid.length} onClick={() => choose([])}>
-          All projects
-        </button>
-        {projects.map((p) => {
-          const on = valid.includes(p.repo);
-          return (
-            <button key={p.repo} type="button" className="chip" aria-pressed={on} onClick={() => choose(on ? valid.filter((x) => x !== p.repo) : [...valid, p.repo])}>
-              {p.repo}
-            </button>
-          );
-        })}
-        {searching && <span className="muted search-note">matching “{q.trim()}”</span>}
-      </div>
       <div className="board">
         <Lane k="stuck" count={counts.stuck}>{grouped(of('stuck'))}</Lane>
         <Lane k="next" count={counts.next} extra={<EstimateTotal items={of('next')} />}>{grouped(of('next'))}</Lane>
@@ -484,9 +421,9 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
             ideaGroups(visibleIdeas)
               .filter((g) => g.ideas.length)
               .map((g) => (
-                <a key={g.key} className="ideas-group-row" data-testid="ideas-row" href={hrefOf({ page: 'ideas', group: g.key })}>
+                <NavLink key={g.key} className="ideas-group-row" testId="ideas-row" to={{ page: 'ideas', group: g.key, p: valid, q: '', sort }}>
                   <span className="group-name">{g.label}</span> <b>{g.ideas.length}</b> <span className="muted first-idea">{g.ideas[0]!.idea.text}</span>
-                </a>
+                </NavLink>
               ))
           )}
         </Lane>
@@ -518,7 +455,7 @@ export function Home({ data, q, only, now }: { data: Data; q: string; only?: str
                 Mark all seen
               </button>
             )}
-            <a href={hrefOf({ page: 'built' })}>Everything built</a>
+            <NavLink to={{ page: 'built', p: valid, q: '', sort }}>Everything built</NavLink>
           </p>
         </Lane>
       </div>
@@ -537,9 +474,8 @@ export function ProjectLabel({ repo }: { repo: string | null }) {
 
 
 /** Every repo's built items, by day, newest first (the board's "All built" link). */
-export function BuiltPage({ data }: { data: Data }) {
-  const sort = loadSort();
-  const items = boardItems(data, sort, null).filter((i) => i.lane === 'done');
+export function BuiltPage({ data, selected, sort }: { data: Data; selected: string[]; sort: SortKey }) {
+  const items = boardItems(data, sort, null).filter((i) => i.lane === 'done' && inFilter(i, selected));
   const days = [...new Set(items.map((i) => i.date!))];
   return (
     <section className="built-page" data-testid="all-built">
@@ -639,8 +575,8 @@ function IdeaRow({ bi, targets }: { bi: BoardIdea; targets: string[] }) {
  * Too big, Not important yet, No reason yet, Maybe never (folded). Unassigned ideas are in it with their own label.
  * `group` (from #/ideas/<group>) scrolls to that group and opens it.
  */
-export function IdeasPage({ data, group }: { data: Data; group?: WhyKey }) {
-  const groups = ideaGroups(boardIdeas(data, loadSort()));
+export function IdeasPage({ data, group, selected, sort }: { data: Data; group?: WhyKey; selected: string[]; sort: SortKey }) {
+  const groups = ideaGroups(boardIdeas(data, sort).filter((i) => inFilter(i, selected)));
   const targets = planTargets(data);
   useEffect(() => {
     if (group) document.getElementById(`why-${group}`)?.scrollIntoView?.({ block: 'start' });
@@ -693,26 +629,88 @@ export function Notices({ data }: { data: Data }) {
   );
 }
 
-/** Everything below the top bar, for a given state (no fetching; tests render this directly). A query shows the home page. */
-export function View({ data, route, q, go, now }: { data: Data; route: Route; q: string; go: (r: Route) => void; now?: Date }) {
-  if (!q.trim()) {
-    if (route.page === 'projects') return <ProjectsPage data={data} go={go} />;
-    if (route.page === 'ideas') return <IdeasPage data={data} group={route.group} />;
-    if (route.page === 'built') return <BuiltPage data={data} />;
-  }
-  return <Home data={data} q={q} only={route.page === 'board' ? route.only : undefined} now={now} />;
+/** Everything below the header, for a given state (no fetching; tests render this directly). A search shows Home. */
+export function View({ data, nav, go, now }: { data: Data; nav: Nav; go: (n: Nav, replace?: boolean) => void; now?: Date }) {
+  const repos = useMemo(() => sortProjects(data.projects.filter((p) => !p.noFiles), nav.sort).map((p) => p.repo), [data, nav.sort]);
+  const place = shownPlace(nav);
+  const selected = hasProjects(place) ? resolveProjects(nav.p, repos) : [];
+  const page =
+    place === 'projects' ? (
+      <ProjectsPage data={data} nav={nav} go={go} />
+    ) : place === 'ideas' ? (
+      <IdeasPage data={data} group={nav.group} selected={selected} sort={nav.sort} />
+    ) : place === 'built' ? (
+      <BuiltPage data={data} selected={selected} sort={nav.sort} />
+    ) : (
+      <Home data={data} q={nav.q} selected={selected} sort={nav.sort} now={now} />
+    );
+  return (
+    <GoContext.Provider value={go}>
+      <PageRows nav={nav} repos={repos} go={go} />
+      {page}
+    </GoContext.Provider>
+  );
 }
 
+/** This tab's own trail of pages, kept in each history entry (for the header's ← → and their tooltips). */
+interface Trail {
+  bk: 1;
+  idx: number;
+  trail: string[];
+}
+const isTrail = (x: unknown): x is Trail => !!x && typeof x === 'object' && (x as Trail).bk === 1 && Number.isInteger((x as Trail).idx) && Array.isArray((x as Trail).trail);
+const currentHash = () => location.hash;
+
 export function App() {
-  const [{ route, q }, setState] = useState(() => parseHash(location.hash));
+  const [nav, setNav] = useState(() => parseHash(location.hash));
+  const [trail, setTrail] = useState<Trail>(() => (isTrail(history.state) ? history.state : { bk: 1, idx: 0, trail: [navLabel(nav)] }));
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const owner = useOwnerState(data, setData);
+  const cur = useRef(trail);
+  cur.current = trail;
 
-  useEffect(() => {
-    const on = () => setState(parseHash(location.hash));
-    addEventListener('hashchange', on);
-    return () => removeEventListener('hashchange', on);
+  useLayoutEffect(() => {
+    if (!isTrail(history.state)) history.replaceState(trail, '');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The browser's back / forward (and an address typed by hand, which gets a trail entry of its own).
+  useLayoutEffect(() => {
+    const pop = (e: PopStateEvent) => {
+      const n = parseHash(location.hash);
+      setNav(n);
+      if (isTrail(e.state)) return setTrail(e.state);
+      const c = cur.current;
+      const next: Trail = { bk: 1, idx: c.idx + 1, trail: [...c.trail.slice(0, c.idx + 1), navLabel(n)] };
+      history.replaceState(next, '');
+      setTrail(next);
+    };
+    addEventListener('popstate', pop);
+    return () => removeEventListener('popstate', pop);
+  }, []);
+
+  /** Every change of what's shown goes through here: a new history entry, or (typing a search) the same one. */
+  const go = useCallback((n: Nav, replace = false) => {
+    const href = hrefOf(n);
+    const shown = parseHash(href);
+    const c = cur.current;
+    if (replace) {
+      const next = { ...c, trail: c.trail.map((t, i) => (i === c.idx ? navLabel(shown) : t)) };
+      history.replaceState(next, '', href);
+      setTrail(next);
+      setNav(shown);
+      return;
+    }
+    if (href === currentHash()) return;
+    const idx = c.idx + 1;
+    const list = [...c.trail.slice(0, idx), navLabel(shown)];
+    history.replaceState({ ...c, trail: list }, ''); // the page we leave learns where → goes
+    const next: Trail = { bk: 1, idx, trail: list };
+    history.pushState(next, '', href);
+    cur.current = next;
+    setTrail(next);
+    setNav(shown);
+    scrollTo(0, 0);
   }, []);
 
   useEffect(() => {
@@ -726,49 +724,53 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.title = titleOf(route, q);
-  }, [route, q]);
+    document.title = titleOf(nav);
+    saveSort(nav.sort);
+  }, [nav]);
 
-  // An old project URL (or a project card) opens the board filtered to it; once the board has taken the filter, the
-  // address becomes plain #/ so the chips stay in charge.
+  // The address always spells out what's shown: project names as the site spells them (old #/p/ZULU → ?p=zulu),
+  // Projects' order included.
   useEffect(() => {
-    if (data && route.page === 'board' && route.only) {
-      history.replaceState(null, '', '#/' + (q ? `?q=${encodeURIComponent(q)}` : ''));
-      setState({ route: { page: 'board' }, q });
+    if (!data) return;
+    const repos = data.projects.filter((p) => !p.noFiles).map((p) => p.repo);
+    const canon = { ...nav, p: hasProjects(shownPlace(nav)) ? resolveProjects(nav.p, repos) : [] };
+    const href = hrefOf(canon);
+    if (href !== currentHash()) {
+      history.replaceState(history.state, '', href);
+      setNav(parseHash(href));
     }
-  }, [data, route, q]);
+  }, [data, nav]);
 
-  const go = (r: Route) => {
-    location.hash = hrefOf(r);
-    scrollTo(0, 0);
+  const pageHistory: PageHistory = {
+    back: trail.idx > 0 ? (trail.trail[trail.idx - 1] ?? 'the previous page') : undefined,
+    forward: trail.trail[trail.idx + 1],
+    onBack: () => history.back(),
+    onForward: () => history.forward(),
   };
-  const setQ = (value: string) => {
-    const to: Route = value ? { page: 'board' } : route;
-    history.replaceState(null, '', hrefOf(to) + (value ? `?q=${encodeURIComponent(value)}` : ''));
-    setState({ route: to, q: value });
-  };
-  const onBoard = route.page === 'board' || !!q;
 
   return (
     <OwnerContext.Provider value={owner}>
-      <nav className="topbar">
-        <a className="brand" href="#/" onClick={() => setQ('')}>
-          <img src="/logo.svg" alt="" width="20" height="20" data-testid="logo" /> backlogkit
-        </a>
-        <a href="#/" className={onBoard ? 'on' : ''}>Home</a>
-        <a href="#/projects" className={route.page === 'projects' && !q ? 'on' : ''}>Projects</a>
-        <a href="#/ideas" className={route.page === 'ideas' && !q ? 'on' : ''}>Ideas</a>
-        <input type="search" placeholder="Search everything…" aria-label="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-        {data && <span className="muted stamp" title={`Read from GitHub at ${data.generatedAt}`}>read {new Date(data.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>}
-        <OwnerControl />
-      </nav>
+      <Header
+        nav={nav}
+        data={data}
+        history={pageHistory}
+        go={go}
+        end={
+          <>
+            <span className="muted stamp" title={data ? `Read from GitHub at ${data.generatedAt}` : 'Reading GitHub…'}>
+              {data ? `read ${new Date(data.generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'reading…'}
+            </span>
+            <OwnerControl />
+          </>
+        }
+      />
       <main>
         {error && <p className="error banner" role="alert">Could not load projects: {error}</p>}
         {!data && !error && <p className="muted">Reading GitHub…</p>}
         {data && (
           <>
             <Notices data={data} />
-            <View data={data} route={route} q={q} go={go} />
+            <View data={data} nav={nav} go={go} />
           </>
         )}
       </main>

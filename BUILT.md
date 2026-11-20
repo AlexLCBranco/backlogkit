@@ -2,7 +2,11 @@
 
 Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never here.
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
-Suite time: last ~0.4 min (2026-11-19) · longest ~0.5 min (2026-11-18)
+Suite time: last ~0.6 min (2026-11-20) · longest ~0.6 min (2026-11-20)
+
+## 2026-11-20
+- BL-19 — Shared layout: pinned header menu, chips instead of dropdowns (v1.16.0) (took 13 min, suite 0.6 min)
+  A header that stays at the top of every page (back / forward, a breadcrumb whose parts jump to their neighbours, "Go anywhere" on Ctrl+K) with four places under it (Home · Projects · Ideas · Built); under it the project chips (What) and, on Projects, the order switches (How) replace the sort dropdown, and every choice is in the address.
 
 ## 2026-11-19
 - Fix: a selection cleared right after a drag could come back (v1.15.1)

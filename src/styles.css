@@ -1,4 +1,4 @@
-/* Dark by default (the owner's standard). Desktop only. */
+/* Dark by default (the owner's standard). Desktop first; phones must not break (BL-19). */
 :root {
   --bg: #0f1115;
   --panel: #171a21;
@@ -6,7 +6,8 @@
   --line: #2a2f3a;
   --text: #e6e8ec;
   --muted: #8b93a3;
-  --accent: #7aa2ff;
+  --accent: #4ea1ff; /* footykit / calendarkit's accent (BL-19: one look across the apps) */
+  --link: #7cb8ff;
   --ok: #4cc38a;
   --warn: #e8b04b;
   --bad: #ef6b6b;
@@ -14,18 +15,12 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif; }
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 .muted { color: var(--muted); }
 
-.topbar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 18px; padding: 10px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.topbar .brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--text); margin-right: 8px; }
-.topbar .brand img { display: block; }
-.topbar a.on { color: var(--text); font-weight: 600; }
-.topbar input { flex: 1; max-width: 460px; margin-left: auto; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
-.topbar .stamp { font-size: 12px; }
-
-main { padding: 18px 24px 48px; max-width: 1600px; margin: 0 auto; }
+main { padding: 10px 24px 48px; max-width: 1600px; margin: 0 auto; }
+@media (max-width: 700px) { main { padding: 10px 12px 48px; } }
 h2 { font-size: 16px; margin: 18px 0 10px; }
 h3 { font-size: 15px; margin: 0; }
 h4 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); text-transform: none; }
@@ -33,7 +28,7 @@ h4 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); text-transform: n
 .warning { color: var(--warn); }
 .error { color: var(--bad); }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr)); gap: 12px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
 .card.clickable { cursor: pointer; }
 .card.clickable:hover { border-color: #3d4556; background: var(--panel-2); }
@@ -80,9 +75,6 @@ button.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 1p
 button.copy.copied { color: var(--ok); }
 h2 button.copy { vertical-align: -3px; }
 
-/* Sort dropdown above the cards (BL-4). */
-.home .sort { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-.home .sort select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
 
 /* Ideas page (BL-7): Unassigned first, then one block per repo with ideas. */
 .ideas-page { max-width: 980px; }
@@ -100,11 +92,6 @@ ul.idea-list li { margin: 3px 0; }
 /* The home page (BL-14): number strip, project chips, five lanes stacked full width. One row per item, the title
    wrapping; click opens the full text in place. */
 main:has(.board-page) { max-width: none; }
-.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 12px; }
-.chip { min-height: 34px; padding: 5px 14px; border-radius: 17px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
-.chip:hover { color: var(--text); border-color: #3d4556; }
-.chip[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #0b0f1a; font-weight: 600; }
-.search-note { font-size: 13px; margin-left: 6px; }
 .board { display: flex; flex-direction: column; gap: 14px; }
 .strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 4px 0 14px; }
 .strip-n { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
@@ -115,7 +102,7 @@ main:has(.board-page) { max-width: none; }
 .strip-stuck { background: #2a2d35; }
 .strip-stuck.has { background: #7a1f2a; border-color: #a33a47; }
 .strip-stuck.has span { color: #ffd0d0; }
-.lane { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px 14px 10px; min-width: 0; scroll-margin-top: 64px; }
+.lane { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 2px 14px 10px; min-width: 0; scroll-margin-top: 104px; }
 .lane h2 { margin: 10px 0 8px; font-size: 18px; }
 .lane .empty { margin: 0 0 6px; font-size: 13.5px; }
 .lane-stuck { background: #2a1519; border-color: #6b2a33; }
@@ -186,7 +173,7 @@ select.move-to { margin-left: 6px; padding: 0 4px; height: 20px; border-radius: 
 .answer-form .error { flex-basis: 100%; font-size: 13px; }
 
 /* Ideas by reason (BL-17). */
-.why-group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px 10px; margin-bottom: 12px; scroll-margin-top: 64px; }
+.why-group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px 10px; margin-bottom: 12px; scroll-margin-top: 104px; }
 .why-group h3 { margin: 10px 0 6px; font-size: 16px; }
 details.why-group > summary { cursor: pointer; list-style: none; }
 details.why-group > summary::-webkit-details-marker { display: none; }

@@ -240,22 +240,4 @@ export function saveSeen(seen: string[]) {
     // storage blocked: seen until the page is reloaded
   }
 }
-
-export const FILTER_STORAGE_KEY = 'backlogkit.board.projects';
-
-export function loadFilter(): string[] {
-  try {
-    const v: unknown = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveFilter(selected: string[]) {
-  try {
-    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(selected));
-  } catch {
-    // storage blocked: the choice lasts until the page is reloaded
-  }
-}
+// (BL-19: the chosen projects live in the address now, not in this browser's storage.)
