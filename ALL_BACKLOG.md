@@ -9,6 +9,7 @@ Planned items only, by repo.
 ### Ready
 
 #### BD-1 — Remove unused shadcn components (lowest priority)
+**In short:** Nothing changes on screen: leftover unused code is removed.
 What it changes: nothing visible; deletes the unused files in `src/components/ui/` (only `dropdown-menu` is used) and prunes their Radix packages. Less CSS weight and lint noise.
 Spec: `PLAN.md`, "Queued", item 6.
 
@@ -16,66 +17,89 @@ Spec: `PLAN.md`, "Queued", item 6.
 
 ### Ready
 
-#### CK-8 — Mark back-to-back meetings with the same opponent
-**What:** some teams meet in consecutive games (example: Tuesday BOS vs MIA is G3/4, Friday BOS vs MIA is G4/4,
-no other game for either team in between). Mark both of those games so it is visible at a glance. Rare, so it
-must cost no space.
+#### CK-25 — Shared layout: pinned header menu, chips instead of dropdowns
+**In short:** calendarkit gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
+**What:**
+- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
+- Where tabs: the existing Schedule · Cup · Standings destinations (plus Tools if it has small tools); the team picker becomes What chips (teams grouped by conference/division, never a dropdown). Keep the current two-row nav decisions as far as they fit the pattern; flag conflicts.
+- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
+**Tests:** as in NAV_PATTERN.md section 6.
 
-**Rule (per team):** a team's game is marked when that team's previous game was against the same opponent
-(consecutive in that team's own schedule, any number of days apart, not only calendar B2Bs). Checked for each
-team separately: if BOS played MIA twice in a row but MIA played someone else in between, only BOS gets it. Mark
-both games of the pair for that team (the first one too, so it is visible before the rematch). Uses the same
-series as the "G2/4" chip (regular season, `src/data/series.ts`); computed once per data set like `leagueSeries`.
+#### CK-22 — Countdown to the Slate's first game (halftime-timer)
+**In short:** The Slate gets a "⏱ Countdown" button that opens halftime-timer with a timer counting down to the day's first tip-off.
+**What:**
+- Button in the Slate header (site and, through the package, the gauntlet Slate widget). Opens halftime-timer in a new tab with an end-time timer set to the first game's start, named e.g. "First game · BOS @ DET 20:00".
+- If the first game has already started, it counts to the next game that hasn't, and the timer name says so ("Next game · …"). If none is left: button disabled, tooltip "No more games today".
+- Uses the link format from halftime-timer HT-1.
+Blocked: waits for halftime-timer HT-1 (its link format and live URL); the owner unblocks it once HT-1 ships.
+**Tests:** unit: first / next not-started game, link built correctly; e2e: the button's link points to halftime-timer with the right time and name.
 
-**Where / how:** on the existing season-series chip (`SeriesChip` in `src/slate/series.tsx`, used by `GameCard`
-and `SlateCard`), so every view and the Slate get it, including copied images. No new element, no extra width
-or height on any card: change the chip's look only (for example a distinct color/outline different from the
-B2B yellow; pick one that reads clearly in the copied image). The chip is marked when at least one of the two teams has the
-mark; its tooltip/pop-up adds one line per marked team, naming it: "BOS: back-to-back meeting, also played
-<Tue Nov 18> / plays again <Fri Nov 21>". In a team's own schedule views, the chip is marked only when the open
-team is one of the marked teams.
+#### CK-23 — Floating live scores window
+**In short:** A "Pop out live scores" button opens a small always-on-top window (like halftime-timer's pop-out) with today's NBA games and live scores, so you can watch them over other apps.
+**What:**
+- Same technique as halftime-timer's pop-out (Document Picture-in-Picture; Chrome/Edge desktop; button hidden where not supported).
+- Button in the Slate header. Window: one compact line per game of the Slate's day: start time or "LIVE Q3 4:12" in red, `BOS 58 @ 61 DET`, finals as finals. Uses CK-21's live data and its polling rules (nothing polls when nothing is live). Hide scores (when shipped) applies here too.
+- Small and resizable; a normal night fits without a scrollbar.
+- Before the first game starts (owner, 2026-11-19, from I-3): the window opens as a countdown to the first game of the Slate's day (like halftime-timer's), and turns into the live scores list by itself at kickoff/tip-off. One click on the pop-out button, one window for the whole night.
+- Needs CK-21 first.
+**Tests:** unit: the window's list (order, live/final/upcoming, hidden scores); e2e: the pop-out content renders from mocked live data.
 
-**Tests:** unit test for the rule (both teams consecutive → both marked; only one team consecutive → only
-that team marked; first and second game of the pair both marked; team view of the unmarked team → chip not
-marked); e2e check that the chip on a marked game has the marked
-style and no card changes size.
+#### CK-24 — NBA history: past seasons' standings, play-in and playoffs
+**In short:** Like the Cup history, you can pick any past NBA season and see its final standings (East and West side by side), the play-in and the full playoff bracket.
+**What:**
+- Season picker (newest first) in Standings, with the same columns as today's standings where the data exists for that season.
+- Play-in (2020-21 on) and the full playoff bracket with series results; hover a series for its games (scores, links to each game page as the app's click rules say: hoopsjunkie where it has the game, NBA.com otherwise).
+- A small summary like the Cup history: champions and conference winners by season.
+- Free sources only (NBA's own data feeds, Basketball-Reference pages for links); go back as far as free data is reliable and say in the report how far that is. Must not slow down today's pages: history loads only when opened.
+**Tests:** unit: final standings and bracket for a few past seasons equal the real ones (checked against a second source); e2e: pick 2015-16, standings and bracket render, a series hover shows its games.
+
+## footykit
+
+### Ready
+
+#### FK-61 — Countdown to the Slate's first match (halftime-timer)
+**In short:** The Slate gets a "⏱ Countdown" button that opens halftime-timer with a timer counting down to the day's first match.
+**What:**
+- Button in the Slate header. Opens halftime-timer in a new tab with an end-time timer set to the first match's kickoff, named e.g. "First match · Arsenal–Chelsea 16:30".
+- If the first match has already started, it counts to the next match that hasn't, and the timer name says so ("Next match · …"). If none is left: button disabled, tooltip "No more matches today".
+- Uses the link format from halftime-timer HT-1.
+Blocked: waits for halftime-timer HT-1 (its link format and live URL); the owner unblocks it once HT-1 ships.
+**Tests:** unit: picking the first / next not-started match, link built correctly; e2e: the button's link points to halftime-timer with the right time and name.
+
+#### FK-63 — Pregame odds on past World Cup matches, and random resimulation
+**In short:** Past World Cup matches show the pregame odds (decimal), and the simulator gets a "Resimulate randomly" button that plays matches using those odds.
+**What:**
+- From I-13. Odds: 1X2 pregame (closing if that's what the source has), decimal, shown on the match square hover and in the match detail; never on the copy-as-image unless there already is an odds spot.
+- Source: free only. Check what free sources really cover (e.g. FootyStats' World Cup downloads, OddsPapi's free tier, openly published odds datasets); The Odds API's history is paid, so not that. Odds likely exist only for recent editions (roughly 2002 on); editions without them show no odds, never made-up ones.
+- Resimulate randomly: in FK-60's simulator, plays every match (or only the ones not fixed by hand) with win/draw/loss chances from the pregame odds (margin removed). Knockout draws go to a 50/50 shoot-out. Button stays hidden for editions without odds (equal odds would be meaningless). "Run again" re-rolls; "Reset to real results" as in FK-60.
+- If no free source covers any edition: stop, add a `Blocked:` note with what was checked, and report.
+**Answered (2026-11-20):** Which odds source (Footiqo manual export, an OddsPapi key, or FootyStats samples)? → The owner exports the World Cup odds CSV from Footiqo by hand.
+**Answered (2026-11-20):** What are "qualifying odds"? → Each knockout tie shows both teams' odds to go through (full time, extra time or penalties), in decimals.
+**Answered (2026-11-20):** How are pairings that never really happened played in the random resim? → The team with the better pre-tournament odds to win the World Cup goes through (those outright odds are also an important stat to show).
+**Answered (2026-11-20):** Where do the odds show? → On screen at all times, more on hover; team names open a team page with its results at previous World Cups.
+**Answered (2026-11-20):** Build on FiveThirtyEight's 2018 and 2022 model forecasts instead? → No: keep it blocked until bookmaker odds can be published.
+Blocked: no publishable source of bookmaker odds found (checked 2026-11-20). Footiqo's export (kept locally in data/odds/, git-ignored) is personal, non-commercial use only. Hugging Face's World Cup odds set: licence "other", free sample 7 matches. SharpAPI (CC BY 4.0): one 2026 snapshot from semi-final week only. Usable instead: FiveThirtyEight's forecasts (CC BY 4.0, via the Wayback Machine) for 2018 and 2022: every match's win / draw / loss chances before kick-off and each team's pre-tournament chance to win the cup. These are model chances, not bookmaker odds; they'd show as decimal "fair odds" (1 ÷ chance), labelled as 538's. Nothing open found for 2026. Waits for a publishable source of bookmaker odds.
+**Tests:** unit: odds → probabilities (margin removed, sum 1); random resim with a fixed seed gives a fixed bracket; editions without odds hide the button; e2e: hover a 2022 match shows odds; resimulate changes the bracket.
 
 ## gauntlet
 
 ### Ready
 
-#### GT-10 — Save a board as a frozen archive file, load it back and edit
-(owner, 2026-11-16, chat)
-The owner makes a board every day and wants to keep past days. A PNG is useless: widgets must stay hoverable.
-- **Save board → file**: one action saves the current board (all pages, or the current one — propose which in the
-  report) to a file on disk (reuse the backup-folder mechanism if it fits). The file holds the full whiteboard plus a
-  **frozen copy of every widget's data at save time** (Slate's games for its date, Boardkit lists/cards, Linkkit maps,
-  web embeds as their link). The file must be self-sufficient: opening it later never pulls today's data.
-- **Load file → gauntlet**: opens as a normal, fully editable board (move, draw, type, add widgets). Frozen widgets
-  keep working (hover popups, clicks, List | Map | Both) using the frozen data, and show a small "frozen" badge.
-- **Edits stay in the file (owner chose A)**: editing a frozen widget (e.g. adding a card to an old list) changes only
-  that board's frozen copy; live Boardkit boards, Linkkit maps and calendarkit data are never touched.
-- **"Go live" per widget**: a button on a frozen widget reconnects it to the live data (replacing the frozen copy,
-  undoable in one step). Never automatic.
-- Not a change to GT-5: live Slates on normal boards still store only date and size; freezing happens only in the
-  saved file.
-Tests: save → load round-trip keeps every widget and its data; a frozen Slate shows the saved games after the live
-schedule is mocked to change; editing a frozen list leaves the live Boardkit board unchanged; "Go live" switches to
-live data and undo restores the frozen copy; badge shows on frozen widgets only; perf.e2e.ts passes without raising
-any limit.
+#### GT-14 — Football Slate and combined Slate widgets
+**In short:** Two new Slate widgets on the whiteboard: football only, and football plus NBA together in time order.
+**What:** next to the NBA Slate widget, a Football Slate widget (footykit's Slate) and a Combined Slate: one Slate with both sports' games sorted by start time, a small sport mark on each card. Each can be placed on its own (NBA only, Football only, Combined). Needs footykit FK-35 first (same card shape); until then this item is `Blocked:` on it. Header: "SLATE · 18-11 · NBA + Football". Live scores and updates as GT-5.
+**Tests:** e2e: each of the three widget kinds renders; combined is in time order with both sports.
 
-#### GT-11 — Slate notes box: fixed 3 lines, scroll inside
-(owner, 2026-11-17, chat)
-Today a game's notes box grows with its text, so cards in a Slate end up different heights. Make every notes box
-exactly 3 lines tall, empty or not. Longer notes scroll inside the box (its own scroll bar), so every card in the
-Slate stays the same size. Applies to the Slate in the whiteboard and in calendarkit (/calendar): the notes field is
-calendarkit's own component (SlateCopy editNotes, `ck:notes:v1`), so change it there and have both use it. Typing,
-clicking away to save and hover popups still work. Tests in both repos: a short note and a long note give the same
-card height; a long note scrolls inside the box and is saved in full.
+#### GT-16 — Countdown button in the Slate widgets
+**In short:** The Slate widgets on the whiteboard get the same "⏱ Countdown" button as calendarkit and footykit, opening halftime-timer counting down to the first game.
+**What:** after calendarkit CK-22 (and footykit FK-61 for the football / combined Slate, GT-14) ship, bump the pinned packages and make sure the button works inside the widgets (opens halftime-timer in a new tab, doesn't interfere with selecting or dragging the widget). Combined Slate: counts to the first game of either sport.
+Blocked: waits for calendarkit CK-22 (and footykit FK-61 for the football and combined Slates); the owner unblocks it once they ship.
+**Tests:** e2e: the button is in the NBA Slate widget and its link points to halftime-timer with the right time.
 
 ### Held (needs the owner's "go"; never built from "build the backlog")
 
 #### GT-6 — Phase 4: things connect (cards go anywhere)
+**In short:** Cards become real whiteboard objects you can grab and move anywhere, in or out of lists.
 Start only when the owner says "go" for GT-6; then move it to Ready. Plan it in steps first (stop after the plan),
 then build one step at a time, stopping to report after each.
 Owner's decisions (2026-10-20, 2026-11-12):
@@ -93,104 +117,55 @@ Owner's decisions (2026-10-20, 2026-11-12):
 Open question for the owner before step 1: the original plan said "notes stick to cards", but sticky notes were removed
 from the toolbar (2026-10-22). What gets attached to a card: text, rectangles, anything? Ask; do not pick a default.
 
+## halftime-timer
+
+### Ready
+
+#### HT-3 — Shared layout: pinned header menu, chips instead of dropdowns
+**In short:** halftime-timer gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
+**What:**
+- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
+- If the app has fewer than 2 places, the header still appears (back/forward, breadcrumb, search) with only the tabs it has; don't invent places.
+- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
+**Tests:** as in NAV_PATTERN.md section 6.
+
 ## rotationkit
 
 ### Ready
 
-#### RK-4 — Phone-usable site (desktop stays as is)
-The owner wants to open rotationkit links on his phone. rotationkit is the only one of his apps getting phone support
-(others stay desktop-only). Desktop layout at >= 1280px must not change.
-
-Found on a 375px check (Nov 2026): the page loads and the top bar, team picker and search fit, but:
-- The games list scrolls inside the page; on touch, swipes over it scroll the list instead of the page (scroll trap).
-- The list fills the first screen, so the opened game (e.g. a direct `?game=` link) starts below the fold.
-- Badges on the right edge of list rows are clipped.
-- Game chart, By day, Q4, Averages, Leaders and player pages were not checked at phone width.
-
-Wanted, at widths < 768px:
-- **Game first:** when a game is open (incl. direct links), the game header and chart are on the first screen. The
-  games list becomes collapsed/compact (tap to expand), with no nested scroll trap.
-- **No page-level horizontal scroll** on any route. Wide content (tables, chart) scrolls inside its own container, with
-  the player-name column sticky where it applies.
-- **Touch replaces hover:** tapping/dragging on the game chart moves the time cursor and shows the on-court lineup for
-  that moment (check the existing pointer handlers already do this on touch; fix if not). Every hover tooltip/pop-up
-  (stint text, badges, fouls, etc.) opens on tap and closes on tap outside. One shared pattern, reused everywhere.
-- **RK-2 resizable panel:** drag-to-resize is disabled on phone widths (doesn't apply there).
-- Badges and chips never clipped; tap targets comfortably finger-sized.
-- Add a rule to CLAUDE.md: every future change must work at 390px and 1280px, and the phone e2e project must pass.
-
-**Tests (automated, no manual testing beyond one final look on a real phone):**
-- Add a Playwright `phone` project (Pixel 7, 390x844, touch) that runs by default alongside desktop.
-- For every route/tab (Games, By day, Q4, Averages, Leaders, player page, team page): assert
-  `document.documentElement.scrollWidth <= clientWidth`, and save a full-page screenshot as a test artifact.
-- Direct game link at 390px: game header is visible in the first viewport without scrolling.
-- Touch swipe over the collapsed games list scrolls the page.
-- Tap on the chart shows the lineup for that moment; tap on a tooltip trigger opens it, tap outside closes it.
-- Desktop e2e suite still passes unchanged.
-
-#### RK-5 — Per-quarter minutes inside stints that cross a quarter break
-Stints that continue across a quarter break (e.g. end of Q2 into Q3) are merged into one bar (`mergeContinuousPts`)
-with one total label ("18:54"). The owner can't tell how much of that was in each quarter.
-
-Wanted (game chart, and anywhere else merged stint bars show labels):
-- Keep one continuous bar (it is one stint), but split it visually at each quarter break: a thin dark notch/gap
-  through the bar at the break, and each quarter's segment in a slightly different shade of the bar color
-  (alternating), so the pieces read as one stint in parts.
-- Split the label: each segment shows its own minutes, e.g. `6:54 │ 12:00` instead of `18:54`. Points (`· 17p`) stay
-  once, after the last segment. Works for stints crossing 2+ breaks (`2:10 │ 12:00 │ 3:05`).
-- If a segment is too narrow for its label, that segment shows no label (the notch still shows); if no segment fits,
-  fall back to the total as today.
-- Hover/tap tooltip shows the total plus the per-quarter split (`18:54 — Q2 6:54, Q3 12:00`).
-- Overtime breaks count as quarter breaks.
-
-**Tests (automated):** unit test for the split (stint crossing 1 and 2 breaks, segment widths/labels, narrow-segment
-fallback); e2e on a fixture game with a Q2→Q3 stint: bar has the notch, labels show the split, tooltip shows total +
-split.
-
-#### RK-6 — Team roster on the player page
-On a player page (e.g. Luka Dončić · LAL), the owner wants to jump to teammates and the team without going back.
-
-Wanted:
-- A roster panel for the selected player's team, placed on the left side of the player page (exact design open; owner
-  hasn't decided — pick something compact that doesn't push the chart down or narrow it much at 1280px).
-- Team name at the top of the panel, clickable → that team's rotations page (same target as other clickable team names).
-- Every roster player clickable → their player page, keeping the current filters (season, Last 5/10/Season,
-  Home/Away, rest, blowout toggle, game type) where they apply.
-- Current player highlighted in the list.
-- Uses the season selected on the page (traded players: show the team for that season; if the player had 2+ teams
-  that season, show the latest team, with the others as links).
-- Phone (< 768px, see RK-4): panel collapses into a "Roster" toggle above the chart, no horizontal scroll.
-
-**Tests (automated):** e2e on a fixture player: roster panel lists the team's players, current player highlighted;
-clicking a teammate opens their page with filters kept; clicking the team name opens the team page; phone project:
-toggle opens/closes the roster and no page-level horizontal scroll.
+#### RK-8 — Shared layout: pinned header menu, chips instead of dropdowns
+**In short:** rotationkit gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
+**What:**
+- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
+- Used on the phone: the 390 px rules in section 4 are a must. Pick the Where tabs from the app's real pages (at most 5); games/teams/dates become What chips or strips; flag in the report how you mapped them.
+- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
+**Tests:** as in NAV_PATTERN.md section 6.
 
 ## statmuse-builder
 
 ### Ready
 
-#### SM-1 — Phone-usable site (desktop stays as is)
-The owner wants to use statmuse-builder on his phone too. Desktop layout at >= 1280px must not change.
+#### SM-6 — Shared layout: pinned header menu, chips instead of dropdowns
+**In short:** statmuse-builder gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
+**What:**
+- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
+- Used on the phone: the 390 px rules in section 4 are a must. Pick the Where tabs from the app's real pages (at most 5); flag in the report how you mapped them.
+- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
+**Tests:** as in NAV_PATTERN.md section 6.
 
-Current state (checked in the code, Nov 2026, not yet seen on a real phone): there are already some phone-width rules
-(`@media (max-width: 640px)` in App.module.css and Filters.module.css, plus a < 1100px rule in RecentList), and only a
-few hover tooltips (`title=`, about 6). e2e runs only on desktop Chrome. So this is mostly check-and-fix, not a redesign.
+#### SM-4 — Draft, college and hometown next to Rotations
+**In short:** In Player mode, next to the "Rotations ↗" button, a short line shows the player's draft spot, college and where he's from, with links to his full draft and his college team's roster.
+**What:**
+- Only for the main player in Player mode (same player the Rotations link uses). Compact line in the empty space right of "Rotations ↗", e.g. "2023 #1 (SAS) · no US college · France".
+- Draft: year, pick number (and round if 2nd), drafting team; "Undrafted" when so. Link: the full draft order of that year (e.g. Basketball-Reference's draft page for that year; verify the URL works).
+- College: school name and years if he played US college; "No US college" otherwise (show his pre-NBA club/country league if the source has it). Link: that college team's roster for his season(s), so his college teammates are visible (e.g. Sports-Reference college basketball; verify). College stats line only if the same free source gives it.
+- Hometown: US-born → city, state; foreign-born → country (city too if the source has it).
+- Hover (tap on phone) shows the full details; must work on desktop and phone (owner's rule for this app) and keep everything on one screen, no scrolling.
+- Data: free source only (e.g. NBA's player info, through a small cached serverless function if the browser can't call it directly). Cache per player. If a field has no free source, leave it out and say so in the report; never guess.
+- Must not slow down typing/searching; the line loads after the player is picked.
+**Tests:** unit: formatting for drafted / undrafted / 2nd round / foreign with and without US college; e2e with mocked data: pick a player, the line and both links appear next to Rotations; one live check against the real source for Victor Wembanyama.
 
-Wanted, at widths < 768px:
-- Everything usable at 390px: question builder, filters, autocomplete, live preview, Recent list, defaults.
-- **No page-level horizontal scroll** on any screen.
-- Autocomplete dropdowns and pickers fit the screen and work with touch and with the phone keyboard open (not hidden
-  behind it).
-- The "open on StatMuse" action is reachable without scrolling far.
-- Tooltips that carry information open on tap and close on tap outside (no hover on phones).
-- Tap targets comfortably finger-sized.
-- Add a rule to CLAUDE.md: every future change must work at 390px and 1280px, and the phone e2e project must pass.
-
-**Tests (automated; no manual testing beyond one final look on a real phone):**
-- Add a Playwright `phone` project (Pixel 7, 390x844, touch) that runs by default alongside desktop, locally and in
-  `e2e:prod`.
-- For every screen/state (empty builder, filters open, autocomplete open, Recent list): assert
-  `document.documentElement.scrollWidth <= clientWidth`, and save a full-page screenshot as a test artifact.
-- Build a full question on the phone project by tapping (player via autocomplete, filters) and assert the generated
-  StatMuse URL equals the desktop result for the same inputs.
-- Desktop e2e suite still passes unchanged.
+#### SM-5 — Links to other stats sites, not only StatMuse
+**In short:** Besides the StatMuse question, the current search can open on other stats sites that aren't the owner's own.
+**What:** for the current selection, extra link buttons that open the same search (or the closest page) on other sites.
+**Answered (2026-11-19):** which sites, and what each should open? → Anything StatMuse is known to be limited on that has an excellent free alternative; Claude Code researches and picks them. For each pick: what StatMuse can't do there, which free site does it well, and what the link opens for the current selection. Free sites only (no paywall or login needed for the page opened). Test every link against the live site before shipping, and list the picks with one line of reason each in the report.
