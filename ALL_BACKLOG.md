@@ -17,14 +17,6 @@ Spec: `PLAN.md`, "Queued", item 6.
 
 ### Ready
 
-#### CK-25 — Shared layout: pinned header menu, chips instead of dropdowns
-**In short:** calendarkit gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
-**What:**
-- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
-- Where tabs: the existing Schedule · Cup · Standings destinations (plus Tools if it has small tools); the team picker becomes What chips (teams grouped by conference/division, never a dropdown). Keep the current two-row nav decisions as far as they fit the pattern; flag conflicts.
-- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
-**Tests:** as in NAV_PATTERN.md section 6.
-
 #### CK-22 — Countdown to the Slate's first game (halftime-timer)
 **In short:** The Slate gets a "⏱ Countdown" button that opens halftime-timer with a timer counting down to the day's first tip-off.
 **What:**
@@ -33,25 +25,6 @@ Spec: `PLAN.md`, "Queued", item 6.
 - Uses the link format from halftime-timer HT-1.
 Blocked: waits for halftime-timer HT-1 (its link format and live URL); the owner unblocks it once HT-1 ships.
 **Tests:** unit: first / next not-started game, link built correctly; e2e: the button's link points to halftime-timer with the right time and name.
-
-#### CK-23 — Floating live scores window
-**In short:** A "Pop out live scores" button opens a small always-on-top window (like halftime-timer's pop-out) with today's NBA games and live scores, so you can watch them over other apps.
-**What:**
-- Same technique as halftime-timer's pop-out (Document Picture-in-Picture; Chrome/Edge desktop; button hidden where not supported).
-- Button in the Slate header. Window: one compact line per game of the Slate's day: start time or "LIVE Q3 4:12" in red, `BOS 58 @ 61 DET`, finals as finals. Uses CK-21's live data and its polling rules (nothing polls when nothing is live). Hide scores (when shipped) applies here too.
-- Small and resizable; a normal night fits without a scrollbar.
-- Before the first game starts (owner, 2026-11-19, from I-3): the window opens as a countdown to the first game of the Slate's day (like halftime-timer's), and turns into the live scores list by itself at kickoff/tip-off. One click on the pop-out button, one window for the whole night.
-- Needs CK-21 first.
-**Tests:** unit: the window's list (order, live/final/upcoming, hidden scores); e2e: the pop-out content renders from mocked live data.
-
-#### CK-24 — NBA history: past seasons' standings, play-in and playoffs
-**In short:** Like the Cup history, you can pick any past NBA season and see its final standings (East and West side by side), the play-in and the full playoff bracket.
-**What:**
-- Season picker (newest first) in Standings, with the same columns as today's standings where the data exists for that season.
-- Play-in (2020-21 on) and the full playoff bracket with series results; hover a series for its games (scores, links to each game page as the app's click rules say: hoopsjunkie where it has the game, NBA.com otherwise).
-- A small summary like the Cup history: champions and conference winners by season.
-- Free sources only (NBA's own data feeds, Basketball-Reference pages for links); go back as far as free data is reliable and say in the report how far that is. Must not slow down today's pages: history loads only when opened.
-**Tests:** unit: final standings and bracket for a few past seasons equal the real ones (checked against a second source); e2e: pick 2015-16, standings and bracket render, a series hover shows its games.
 
 ## footykit
 
@@ -81,6 +54,18 @@ Blocked: waits for halftime-timer HT-1 (its link format and live URL); the owner
 Blocked: no publishable source of bookmaker odds found (checked 2026-11-20). Footiqo's export (kept locally in data/odds/, git-ignored) is personal, non-commercial use only. Hugging Face's World Cup odds set: licence "other", free sample 7 matches. SharpAPI (CC BY 4.0): one 2026 snapshot from semi-final week only. Usable instead: FiveThirtyEight's forecasts (CC BY 4.0, via the Wayback Machine) for 2018 and 2022: every match's win / draw / loss chances before kick-off and each team's pre-tournament chance to win the cup. These are model chances, not bookmaker odds; they'd show as decimal "fair odds" (1 ÷ chance), labelled as 538's. Nothing open found for 2026. Waits for a publishable source of bookmaker odds.
 **Tests:** unit: odds → probabilities (margin removed, sum 1); random resim with a fixed seed gives a fixed bracket; editions without odds hide the button; e2e: hover a 2022 match shows odds; resimulate changes the bracket.
 
+#### FK-68 — FIFA+ full-match links on 2022 World Cup matches
+**In short:** Every 2022 World Cup match with a free full replay on FIFA's own site gets a ▶ link that opens it.
+**What:**
+- Same ▶ as FK-67, same places, on the 2022 edition. Title: "Full match on FIFA+". The Google link on the score stays.
+- Target: the match's "Full Match Replay" page on FIFA+ (seen from chat on 2026-11-20: the final is at `https://www.fifa.com/en/watch/Ar2sZ_9GHkie8SDq2Mt4gg`, 2h38). The page IDs are random, so each match needs its real URL: never a built or guessed one.
+- Fallback, only when a match has no FIFA+ replay page: FIFA's official YouTube "FULL MATCH" upload of it (the final is `https://www.youtube.com/watch?v=RgqKdplLIk4`), title "Full match on FIFA's YouTube". Neither exists: no ▶.
+- Data: `public/worldcup/2022-videos.json`, match number → full URL, built by a script. Share one file shape and one ▶ component with FK-67 (if FK-67 stored YouTube IDs only, widen it to full URLs).
+- Not known from chat: how to list the 64 replay pages (FIFA+ is script-rendered; look for a public listing, API or sitemap), whether all 64 exist, and whether playback needs a sign-in or is region-limited. The script prints which matches have no link.
+- If the pages can't be listed automatically: stop, add a `Blocked:` note with what was tried, and report.
+Blocked: the 64 replay pages could not be listed (tried 2026-11-20). fifa.com's robots.txt names a sitemap at `https://cxm-api.fifa.com/fifaplusweb/api/sitemaps`, and each replay page loads its data from that same host (`…/api/pages/en/watch/<id>`, `…/api/sections/videoDetails/<id>`), but Claude Code's permission guard refused every read of cxm-api.fifa.com (curl and the browser), so nothing could be listed. The 2022 tournament page on fifa.com links to no replay. Seen on the way: the final's page plays in the browser with no sign-in (from Brazil). To unblock: allow Claude Code to read cxm-api.fifa.com (a permission rule), or say to use FIFA's YouTube "FULL MATCH" uploads for all 64 instead.
+**Tests:** unit: a match with a FIFA+ URL uses it, one with only a YouTube URL uses that with the other title, one with neither renders no ▶; e2e: the 2022 final has a ▶ whose href is the FIFA+ replay page; data check: every URL in the file answers 200. By hand (can't be automated): open one ▶ and confirm the full match plays without paying.
+
 ## gauntlet
 
 ### Ready
@@ -88,6 +73,7 @@ Blocked: no publishable source of bookmaker odds found (checked 2026-11-20). Foo
 #### GT-14 — Football Slate and combined Slate widgets
 **In short:** Two new Slate widgets on the whiteboard: football only, and football plus NBA together in time order.
 **What:** next to the NBA Slate widget, a Football Slate widget (footykit's Slate) and a Combined Slate: one Slate with both sports' games sorted by start time, a small sport mark on each card. Each can be placed on its own (NBA only, Football only, Combined). Needs footykit FK-35 first (same card shape); until then this item is `Blocked:` on it. Header: "SLATE · 18-11 · NBA + Football". Live scores and updates as GT-5.
+Blocked: (2026-11-21) FK-35 shipped, but the "same card shape" it promised no longer holds, and the combined Slate needs answers and kit work first: (1) footykit's cards are now 561 × 96 (FK-50, FK-53, FK-73), calendarkit's 509 × 78: how do the two sit in one grid (football's size for every cell with NBA cards padded, each card its own size, or footykit back to 509 × 78)? (2) Neither kit offers one card on its own: footykit's part draws a whole day (SlateDay) and calendarkit's a whole night with its own header (SlateCopy), so cards can't be mixed in time order or given a sport mark until both export a single card (new footykit and calendarkit items). (3) Which games are "18-11" in a combined Slate: the NBA night is a US Eastern date, football's day is the local (São Paulo) day. (4) No footykit Slate kit is served at run time as calendarkit's is (/calendar/slatekit/): is a pinned footykit package enough (a new card design then needs a new pin here), or should footykit get a kit too? The owner answers and unblocks.
 **Tests:** e2e: each of the three widget kinds renders; combined is in time order with both sports.
 
 #### GT-16 — Countdown button in the Slate widgets
@@ -128,44 +114,3 @@ from the toolbar (2026-10-22). What gets attached to a card: text, rectangles, a
 - If the app has fewer than 2 places, the header still appears (back/forward, breadcrumb, search) with only the tabs it has; don't invent places.
 - Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
 **Tests:** as in NAV_PATTERN.md section 6.
-
-## rotationkit
-
-### Ready
-
-#### RK-8 — Shared layout: pinned header menu, chips instead of dropdowns
-**In short:** rotationkit gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
-**What:**
-- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
-- Used on the phone: the 390 px rules in section 4 are a must. Pick the Where tabs from the app's real pages (at most 5); games/teams/dates become What chips or strips; flag in the report how you mapped them.
-- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
-**Tests:** as in NAV_PATTERN.md section 6.
-
-## statmuse-builder
-
-### Ready
-
-#### SM-6 — Shared layout: pinned header menu, chips instead of dropdowns
-**In short:** statmuse-builder gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
-**What:**
-- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
-- Used on the phone: the 390 px rules in section 4 are a must. Pick the Where tabs from the app's real pages (at most 5); flag in the report how you mapped them.
-- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
-**Tests:** as in NAV_PATTERN.md section 6.
-
-#### SM-4 — Draft, college and hometown next to Rotations
-**In short:** In Player mode, next to the "Rotations ↗" button, a short line shows the player's draft spot, college and where he's from, with links to his full draft and his college team's roster.
-**What:**
-- Only for the main player in Player mode (same player the Rotations link uses). Compact line in the empty space right of "Rotations ↗", e.g. "2023 #1 (SAS) · no US college · France".
-- Draft: year, pick number (and round if 2nd), drafting team; "Undrafted" when so. Link: the full draft order of that year (e.g. Basketball-Reference's draft page for that year; verify the URL works).
-- College: school name and years if he played US college; "No US college" otherwise (show his pre-NBA club/country league if the source has it). Link: that college team's roster for his season(s), so his college teammates are visible (e.g. Sports-Reference college basketball; verify). College stats line only if the same free source gives it.
-- Hometown: US-born → city, state; foreign-born → country (city too if the source has it).
-- Hover (tap on phone) shows the full details; must work on desktop and phone (owner's rule for this app) and keep everything on one screen, no scrolling.
-- Data: free source only (e.g. NBA's player info, through a small cached serverless function if the browser can't call it directly). Cache per player. If a field has no free source, leave it out and say so in the report; never guess.
-- Must not slow down typing/searching; the line loads after the player is picked.
-**Tests:** unit: formatting for drafted / undrafted / 2nd round / foreign with and without US college; e2e with mocked data: pick a player, the line and both links appear next to Rotations; one live check against the real source for Victor Wembanyama.
-
-#### SM-5 — Links to other stats sites, not only StatMuse
-**In short:** Besides the StatMuse question, the current search can open on other stats sites that aren't the owner's own.
-**What:** for the current selection, extra link buttons that open the same search (or the closest page) on other sites.
-**Answered (2026-11-19):** which sites, and what each should open? → Anything StatMuse is known to be limited on that has an excellent free alternative; Claude Code researches and picks them. For each pick: what StatMuse can't do there, which free site does it well, and what the link opens for the current selection. Free sites only (no paywall or login needed for the page opened). Test every link against the live site before shipping, and list the picks with one line of reason each in the report.
