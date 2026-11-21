@@ -498,3 +498,51 @@ describe('one-click moves (BL-11)', () => {
     expect(next.unassigned.ideas).toEqual([]);
   });
 });
+
+describe('searching a code explains it at the top (BL-20)', () => {
+  it('a built code: one box above the lanes with code, title, project, state and description; the item stays below', () => {
+    show('#/?q=dm5');
+    const box = screen.getByTestId('code-box');
+    expect(box.compareDocumentPosition(screen.getByTestId('strip')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(box).getByTestId('code-id').textContent).toBe('DM-5');
+    expect(within(box).getByTestId('code-title').textContent).toBe('Newest thing');
+    expect(within(box).getByTestId('code-repo').textContent).toBe('demo');
+    expect(within(box).getByTestId('code-state').textContent).toBe('Built · v1.3.0 · 2026-11-17');
+    expect(within(box).getByTestId('code-short').textContent).toBe('What the owner sees now.');
+    expect(within(box).getByTestId('code-link').getAttribute('href')).toBe('https://github.com/AlexLCBranco/demo/blob/main/BUILT.md');
+    expect(lines('done')).toEqual(['demo | Newest thing (v1.3.0) | DM-5']);
+  });
+  it('planned and blocked codes; a missing In short line is a dash', () => {
+    show('#/?q=OT-10');
+    expect(screen.getByTestId('code-state').textContent).toBe('Planned');
+    expect(screen.getByTestId('code-short').textContent).toBe('Other gets ten.');
+    cleanup();
+    show('#/?q=ot-11');
+    expect(screen.getByTestId('code-state').textContent).toBe('Blocked');
+    expect(screen.getByTestId('code-short').textContent).toBe('—');
+  });
+  it('an idea with its repo, and an unassigned one: no In short line', () => {
+    show('#/?q=demo%20i-2');
+    const box = screen.getByTestId('code-box');
+    expect(within(box).getByTestId('code-state').textContent).toBe('Idea');
+    expect(within(box).getByTestId('code-repo').textContent).toBe('demo');
+    expect(within(box).queryByTestId('code-short')).toBeNull();
+    expect(within(lane('ideas')).getAllByTestId('idea')).toHaveLength(1); // the results below are that idea
+    cleanup();
+    show('#/?q=u1');
+    expect(screen.getByTestId('code-repo').textContent).toBe('Unassigned');
+    expect(screen.getByTestId('code-title').textContent).toBe('Orphan gadget');
+  });
+  it('an unknown code says so; ordinary words show no box', () => {
+    show('#/?q=CK-999');
+    expect(screen.getByTestId('code-missing').textContent).toBe('No feature has the code CK-999');
+    expect(screen.queryByTestId('code-hit')).toBeNull();
+    expect(screen.getAllByTestId(/^lane-/)).toHaveLength(5); // the normal results stay below
+    cleanup();
+    show('#/?q=thing');
+    expect(screen.queryByTestId('code-box')).toBeNull();
+    cleanup();
+    show('#/');
+    expect(screen.queryByTestId('code-box')).toBeNull();
+  });
+});

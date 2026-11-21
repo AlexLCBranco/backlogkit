@@ -160,7 +160,7 @@ test.describe('mocked GitHub', () => {
 
     await done.getByRole('link', { name: 'Everything built' }).click();
     await expect(page).toHaveURL(/#\/built$/);
-    await expect(page.getByTestId('all-built-day').last()).toContainText('ZU-1');
+    await expect(page.getByTestId('all-built-day').filter({ hasText: '2026-11-12' })).toContainText('ZU-1'); // older than 7 days
   });
 
   test('project chips: All projects first, at least 32 px tall, filter lanes and strip, kept in the address; cards and old URLs open it filtered', async ({ page }) => {
@@ -235,6 +235,33 @@ test.describe('mocked GitHub', () => {
     await page.getByTestId('search-clear').click();
     await expect(page).toHaveTitle('backlogkit · Home');
     await expect.poll(() => heads(page)).toEqual(ALL_HEADS);
+  });
+
+  test('searching a code explains it in a box at the top; an unknown code says so (BL-20)', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByTestId('lane-done')).toBeVisible();
+    await expect(page.getByTestId('code-box')).toHaveCount(0);
+    await searchAll(page, 'ck-17');
+    const box = page.getByTestId('code-box');
+    await expect(box.getByTestId('code-id')).toHaveText('CK-17');
+    await expect(box.getByTestId('code-title')).toHaveText('Week view');
+    await expect(box.getByTestId('code-repo')).toHaveText('zulu');
+    await expect(box.getByTestId('code-state')).toHaveText('Built · v0.1.0 · 2026-10-01');
+    await expect(box.getByTestId('code-short')).toHaveText('The calendar shows one week at a time.');
+    await expect(box.getByTestId('code-link')).toHaveAttribute('href', 'https://github.com/AlexLCBranco/zulu/blob/main/BUILT.md');
+    // Above the results, which stay below with the item in them.
+    const top = (await box.boundingBox())!;
+    expect(top.y + top.height).toBeLessThanOrEqual((await page.getByTestId('strip').boundingBox())!.y);
+    await expect(page.getByTestId('lane-done').getByTestId('board-item')).toHaveCount(1);
+    await expect(page.getByTestId('lane-done')).toContainText('Week view');
+
+    const search = page.getByRole('searchbox', { name: 'Search' });
+    await search.fill('CK-999');
+    await expect(page.getByTestId('code-missing')).toHaveText('No feature has the code CK-999');
+    await expect(page.getByTestId('code-hit')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="lane-"]')).toHaveCount(5);
+    await search.fill('thing'); // ordinary words: no box
+    await expect(page.getByTestId('code-box')).toHaveCount(0);
   });
 
   test('one vocabulary: none of Now, Next, Ready, Held, Planned as labels on any page (BL-14)', async ({ page }) => {

@@ -134,6 +134,17 @@ main:has(.board-page) { max-width: none; }
 .badge.blocked { background: #6b1f27; color: #ffd0d0; font-weight: 600; }
 .tag { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); color: #c9ced8; white-space: nowrap; }
 .tag-unassigned { color: var(--warn); }
+/* BL-20: what a searched code is, above the results. */
+.code-box { background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin: 0 0 12px; }
+.code-box h2 { margin: 0 0 6px; font-size: 16px; }
+.code-box h2 .id { font-size: 14px; margin-right: 6px; }
+.code-box p { margin: 3px 0; }
+.code-hit + .code-hit { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+.code-state { font-weight: 600; }
+.code-state-built { color: var(--ok); }
+.code-state-blocked { color: var(--bad); }
+.code-state-idea { color: var(--warn); }
+.code-missing { color: var(--warn); }
 .all-built { margin: 10px 0 0; font-size: 13px; }
 .built-page { max-width: 980px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px 14px; }
 /* One-click moves (BL-11): only for the owner, after unlocking. */

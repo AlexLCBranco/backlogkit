@@ -2,6 +2,35 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-21 — BL-20
+
+**Built**
+- BL-20 — Searching a feature code explains it at the top (v1.17.0). A search that is exactly a code shows a box
+  above the five lanes: code, title, Project, State (Planned / Blocked / Built · version · date / Idea), In short
+  (built items: their description line; nobody wrote one: a dash; ideas: no such line) and a link. An unknown code:
+  "No feature has the code CK-999". The normal results stay below.
+
+**Decided without the spec saying** (say if you want any changed)
+- "An idea I-n with its repo": both ways work. "demo I-2" or "I-2 demo" shows that repo's idea; "I-2" alone shows
+  one box entry per repo that has an I-2 (only the chosen projects' when chips are on and they have one).
+- "The dash optional" ("ck17") only counts when the letters are a prefix some item really uses, so a word like "ps5"
+  stays an ordinary search. With the dash, any code counts ("XX-999" → the not-found line).
+- "A link to the item" opens the file it is written in on GitHub (planned: straight to its heading in
+  `FEATURE_BACKLOG.md`; built: `BUILT.md`; ideas: `IDEAS.md` / `UNASSIGNED_IDEAS.md`). Items have no page of their own
+  on the site.
+- A built item's title in the box drops its "(v1.3.0)" ending, since the State line says the version.
+- BL-20 had no `**Estimate:**` line; none was added because it shipped in the same run (took 9 min, suite 0.6 min).
+
+**Also fixed:** CI on main was red since the 2026-11-20 backlog commit: a unit test read the real
+`UNASSIGNED_IDEAS.md` and expected it empty, and it now has U-1 and U-2. The test uses its own header-only text now.
+
+**Tests:** 184 unit + 32 e2e pass locally (suite 0.6 min). New: `tests/code.test.ts` (detection and lookup across
+planned, built, ideas), four page tests, and the e2e ("ck-17" shows the box with the built description; "CK-999"
+shows the not-found line). One old e2e line changed: it assumed the oldest built day in the fixture was zulu's.
+
+**Blocked:** none. **Ideas added:** none.
+**Test by hand:** nothing needed; only whether the box reads well to you.
+
 ## 2026-11-20 — BL-19
 
 **Built**

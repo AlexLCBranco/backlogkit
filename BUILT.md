@@ -2,7 +2,13 @@
 
 Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never here.
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
-Suite time: last ~0.6 min (2026-11-20) · longest ~0.6 min (2026-11-20)
+Suite time: last ~0.6 min (2026-11-21) · longest ~0.8 min (2026-11-21)
+
+## 2026-11-21
+- BL-20 — Searching a feature code explains it at the top (v1.17.0) (took 9 min, suite 0.6 min)
+  Typing a code like "CK-17" (or "ck17", "demo I-2", "U-1") in search shows a box above the results with its title, project, state, its one-sentence summary and a link to where it is written on GitHub; an unknown code says "No feature has the code CK-999".
+### Internal
+- test: the unassigned-ideas test no longer reads the real `UNASSIGNED_IDEAS.md` (it failed on main once U-1 and U-2 were added)
 
 ## 2026-11-20
 - BL-19 — Shared layout: pinned header menu, chips instead of dropdowns (v1.16.0) (took 13 min, suite 0.6 min)

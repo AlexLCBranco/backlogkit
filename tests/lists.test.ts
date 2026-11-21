@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { WHY, builtSummary, counts, ideaMarkdown, splitIdea, parseBacklog, parseBuilt, parseBuiltDays, parseIdeas, parseShort, parseUnassignedIdeas } from '../lib/lists.mjs';
 import { BACKLOG, BUILT, IDEAS } from './fixtures';
 
@@ -90,7 +89,8 @@ describe('parseUnassignedIdeas (BL-7)', () => {
   });
   it('an empty file, or one with only its header, has none', () => {
     expect(parseUnassignedIdeas('')).toEqual([]);
-    expect(parseUnassignedIdeas(readFileSync('UNASSIGNED_IDEAS.md', 'utf8'))).toEqual([]); // the real file, as created
+    // Only its header (not the real file: that one has ideas in it whenever the owner adds some).
+    expect(parseUnassignedIdeas('# Unassigned ideas\n\nIdeas the owner mentioned that fit no repo yet. IDs are U-1, U-2, ... (never reused).\n')).toEqual([]);
   });
   it('reads U-n items, wrapped lines joined, CRLF too', () => {
     expect(parseUnassignedIdeas('# Unassigned\r\n\r\nText.\r\n\r\n- U-1 — One (2026-11-18)\r\n- U-2 — Two\r\n  wraps (2026-11-19)\r\n')).toMatchObject([

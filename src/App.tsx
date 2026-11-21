@@ -10,6 +10,8 @@ import type { Data, Estimate, Idea, Project } from './types';
 import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
+import { CodeBox } from './CodeBox';
+import { codePrefixes, lookupCode, parseCode } from './code';
 import { MoveButton, OwnerContext, OwnerControl, useOwner, useOwnerState } from './owner';
 import { saveSort, sortProjects, type SortKey } from './sort';
 import { estimateTotal, formatDuration, ideaMarkdown } from '../lib/lists.mjs';
@@ -376,8 +378,13 @@ export function Home({ data, q, selected: valid, sort, now }: { data: Data; q: s
   const items = useMemo(() => boardItems(data, sort, searching ? null : cutoff), [data, sort, searching, cutoff]);
   const [seen, setSeen] = useState<string[] | null>(loadSeen);
   const ideas = useMemo(() => boardIdeas(data, sort), [data, sort]);
-  const visible = items.filter((i) => inFilter(i, valid) && matches(i, q));
-  const visibleIdeas = ideas.filter((i) => inFilter(i, valid) && ideaMatches(i, q));
+  // A search that is exactly a code (BL-20): explained in a box on top; the results below are that code's items.
+  const code = useMemo(() => parseCode(q, data.projects.map((p) => p.repo), codePrefixes(data)), [data, q]);
+  const codeHits = useMemo(() => (code ? lookupCode(data, code, valid) : []), [data, code, valid]);
+  const text = code ? code.code : q;
+  const inRepo = (i: { repo: string | null }) => !code?.repo || i.repo === code.repo;
+  const visible = items.filter((i) => inFilter(i, valid) && inRepo(i) && matches(i, text));
+  const visibleIdeas = ideas.filter((i) => inFilter(i, valid) && inRepo(i) && ideaMatches(i, text));
   const fresh = newDone(visible, seen, today);
   const lastWeek = visible.filter((i) => i.lane === 'done' && i.date! >= builtCutoff(today)).length;
   const counts = { ...laneCounts(visible, visibleIdeas), ...(searching ? {} : { done: fresh.length }) };
@@ -403,6 +410,7 @@ export function Home({ data, q, selected: valid, sort, now }: { data: Data; q: s
       <div ref={marquee} className="marquee" aria-hidden="true" data-testid="marquee" />
       <SelectionStyle store={selection} />
       <SelectionBar store={selection} text={copyText} />
+      {code && <CodeBox query={code} hits={codeHits} />}
       <NumberStrip counts={counts} />
       <div className="board">
         <Lane k="stuck" count={counts.stuck}>{grouped(of('stuck'))}</Lane>
