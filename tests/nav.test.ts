@@ -59,6 +59,7 @@ describe('the header', () => {
       ['Projects', '#/projects?sort=name-asc', false],
       ['Ideas', '#/ideas?p=demo', true],
       ['Built', '#/built?p=demo', false],
+      ['Build order', '#/order?p=demo', false],
     ]);
     expect(project!.items.map((i) => [i.label, hrefOf(i.to)])).toEqual([
       ['All projects', '#/ideas/later'],

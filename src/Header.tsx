@@ -18,6 +18,7 @@ const ICONS: Record<Place, ReactNode> = {
   board: <path d="M2 7.2L8 2.2l6 5M3.6 6v7.8h3.2V10h2.4v3.8h3.2V6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />,
   projects: <><rect x="2" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" /><rect x="9" y="2" width="5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" /><rect x="2" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" /><rect x="9" y="9" width="5" height="5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" /></>,
   ideas: <><path d="M8 1.8a4.3 4.3 0 00-2.6 7.7c.5.4.8 1 .8 1.6v.6h3.6v-.6c0-.6.3-1.2.8-1.6A4.3 4.3 0 008 1.8z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><path d="M6.3 14h3.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></>,
+  order: <><path d="M6.5 3.5h7.5M6.5 8h7.5M6.5 12.5h7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /><circle cx="3" cy="3.5" r="1.3" fill="currentColor" /><circle cx="3" cy="8" r="1.3" fill="currentColor" /><circle cx="3" cy="12.5" r="1.3" fill="currentColor" /></>,
   built: <><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M5.2 8.2l2 2 3.7-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></>,
 };
 

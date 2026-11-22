@@ -2,6 +2,54 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-21 — BL-23
+
+**Built**
+- BL-23 — Build order: what to build first, across every repo (v1.20.0). A fifth place in the header, "Build order"
+  (`#/order`). Rounds from the item IDs in `Blocked:` lines (as BL-21 reads them; a shipped ID is no longer a
+  link; links cross repos): "Round 1 · Build these now", "Round 2 · Build these after round 1", ... Inside a round:
+  most waited-for first (counting down the whole chain), then the shorter build estimate, then repo, then ID. Each row:
+  ID (opens the item), title, repo, the "In short" sentence, "Opens: ..." and "After: ...". A stuck item whose named IDs
+  have all shipped is in round 1 with the green "can be unblocked" note. "Needs you": a `Blocked:` line with no ID,
+  an ID found nowhere, an idea ("Waits for an idea that is not planned yet: I-1"), or a loop ("These wait for each
+  other: fix the Blocked lines"); what waits for one of these sits under it, pushed to the right. "Waiting for your
+  go": every Held item. "Copy order" copies the rounds, one line per item: `Round 1 · AL-1 · alpha · Base`. The page
+  only shows; it edits nothing.
+- BL-23 was under Held; "build bl-23" was taken as the go.
+- Rule text added to this repo's CLAUDE.md ("backlogkit formats", Blocked bullet).
+
+**Asked and answered (2026-11-21)**
+- A Ready item that waits for a Held item → it goes under that Held item in "Waiting for your go", pushed to the right.
+- Project chips → the page has them; rounds are always worked out across every repo, the chips only hide rows, and
+  round numbers stay the same (an empty round is not shown).
+- An estimate that is a range → its middle counts (~40–60 min = 50).
+
+**Decided without the spec saying** (say if you want it changed)
+- "Build order" is the last of the five header tabs (NAV_PATTERN.md allows at most 5: the header is now full).
+- A Held item stays in "Waiting for your go" whatever its `Blocked:` line says (its text shows there).
+- An item that waits for several "Needs you" / Held items sits under the first one written in its `Blocked:` line.
+- An item with no ID shows a dash and has no links. Copy order copies only the rounds (not the two piles), and only
+  the projects chosen in the chips.
+- The two piles use the same order as a round (most waited-for first, ...).
+
+**For you / the Claude chat**
+- Other repos that need the same sentence in "backlogkit formats" → Blocked (not edited from here): footykit,
+  gauntlet, calendarkit, boardkit, rotationkit, halftime-timer, statmuse-builder, linkkit.
+
+**Went wrong in this run**
+- One shell command that wrote the new test files was cut short (a here-document); nothing ran from it. The files
+  were rewritten and everything re-run.
+- First full run: 1 old unit test failed (a list of the four header places needed the fifth). Fixed; re-run green.
+
+**Tests:** 218 unit + 35 e2e pass locally (suite 0.5 min). New: 17 unit (rounds: a chain of 3, two waiting for one, a
+shipped ID, a cross-repo link; the order inside a round; no-ID, unknown-ID, idea and loop items in "Needs you" with
+their dependents; a loop of three ends; Held stays out; chips; the copied text; the page) and 1 e2e (opens from the
+header, "Build these now", Copy order equals the order on screen, indented rows sit to the right, chips, reload, the
+ID opens the item, no sideways scroll at 390 px), plus a live check that the page opens with real data.
+
+**Blocked:** none. **Ideas added:** none.
+**Test by hand:** nothing needed.
+
 ## 2026-11-21 — BL-22
 
 **Built**

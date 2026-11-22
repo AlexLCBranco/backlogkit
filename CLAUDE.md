@@ -76,7 +76,8 @@ backlogkit (the owner's site that shows every repo's lists) reads these lines; k
   blocked items (they stay where they are) until the owner answers. An answer replaces the `Blocked:` line with
   `**Answered (YYYY-MM-DD):** <the question> → <the answer>`; from then on the item is built normally.
   When an item waits for another item (in this repo or another), write that item's ID in the `Blocked:` line; backlogkit
-  then says when it has shipped.
+  then says when it has shipped. Every item an item needs first must be written by ID in its `Blocked:` line, also
+  when the line is mainly a question to the owner: backlogkit's Build order page only sees the IDs written there.
 - Ideas: every idea in `IDEAS.md` ends with one reason tag saying why it isn't planned: `[why: waiting]` waits on
   something (a data source, a key or account, another feature, an outside event; the idea's text says which),
   `[why: paywall]` needs something that costs money (paid data, a paid API, a paid plan);

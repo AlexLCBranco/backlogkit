@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { fixtureData } from './fixture-data';
 
 const live = !!process.env.LIVE_URL;
-const PAGES = ['#/', '#/projects', '#/ideas', '#/built'];
+const PAGES = ['#/', '#/projects', '#/ideas', '#/built', '#/order'];
 const TODAY = new Date('2026-11-19T12:00:00');
 const heads = (page: Page) => page.locator('[data-testid^="lane-"] > h2').allTextContents();
 const header = (page: Page) => page.getByTestId('top-bar');
@@ -29,7 +29,7 @@ test.describe('shared layout (BL-19)', () => {
       const h = (await header(page).boundingBox())!.height;
       expect(h, hash).toBe(before);
       heights.push(h);
-      await expect(header(page).getByTestId('where-tabs').getByRole('link')).toHaveText(['Home', 'Projects', 'Ideas', 'Built']);
+      await expect(header(page).getByTestId('where-tabs').getByRole('link')).toHaveText(['Home', 'Projects', 'Ideas', 'Built', 'Build order']);
       await expect(header(page).getByTestId('go-anywhere')).toBeVisible();
       await page.mouse.wheel(0, 2000);
       await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(0);
@@ -83,7 +83,7 @@ test.describe('shared layout (BL-19)', () => {
     await page.getByTestId('crumb-menu').getByRole('menuitem', { name: 'Needs your decision' }).click();
     await expect(page).toHaveURL(/#\/ideas\/decision\?p=alpha$/);
     await page.getByTestId('crumb-btn').first().click();
-    await expect(page.getByTestId('crumb-menu').getByRole('menuitem')).toHaveText(['Home', 'Projects', 'Ideas', 'Built']);
+    await expect(page.getByTestId('crumb-menu').getByRole('menuitem')).toHaveText(['Home', 'Projects', 'Ideas', 'Built', 'Build order']);
     await page.getByTestId('crumb-menu').getByRole('menuitem', { name: 'Built' }).click();
     await expect(page).toHaveURL(/#\/built\?p=alpha$/);
     await page.keyboard.press('Escape');

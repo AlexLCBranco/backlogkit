@@ -1,5 +1,5 @@
 // The site: Home (five lanes across all repos with a number strip on top, BL-14), Projects (one compact card each,
-// BL-10), Ideas, and Everything built, under the shared pinned header (BL-19, NAV_PATTERN.md). Every state lives in
+// BL-10), Ideas, Everything built, and Build order (BL-23, OrderPage.tsx), under the shared pinned header (BL-19, NAV_PATTERN.md). Every state lives in
 // the address (src/nav.ts); old #/p/<repo> and #/all addresses still open Home.
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Header, type PageHistory } from './Header';
@@ -11,6 +11,7 @@ import { SiteVersion } from './SiteVersion';
 import { BUILD_INFO } from './build-info';
 import { CopyButton } from './CopyButton';
 import { CodeBox } from './CodeBox';
+import { OrderPage } from './OrderPage';
 import { codePrefixes, lookupCode, parseCode } from './code';
 import { codeIndex } from './waits';
 import { MoveButton, OwnerContext, OwnerControl, useOwner, useOwnerState } from './owner';
@@ -668,6 +669,8 @@ export function View({ data, nav, go, now }: { data: Data; nav: Nav; go: (n: Nav
       <IdeasPage data={data} group={nav.group} selected={selected} sort={nav.sort} />
     ) : place === 'built' ? (
       <BuiltPage data={data} selected={selected} sort={nav.sort} />
+    ) : place === 'order' ? (
+      <OrderPage data={data} selected={selected} sort={nav.sort} />
     ) : (
       <Home data={data} q={nav.q} selected={selected} sort={nav.sort} now={now} />
     );

@@ -1,12 +1,12 @@
 // BL-19: the shared layout's state (NAV_PATTERN.md §3). Everything on screen comes from the address:
-//   #/ (Home), #/projects, #/ideas[/<reason>], #/built, plus ?p=<repo>,<repo> (the What chips: which projects),
+//   #/ (Home), #/projects, #/ideas[/<reason>], #/built, #/order (Build order, BL-23), plus ?p=<repo>,<repo> (the What chips: which projects),
 //   ?q=<search> and, on Projects, ?sort=<key> (the How switch).
 // Old addresses still work: #/p/<repo> opens Home with that project, #/all opens Home.
 import { LANES, WHY_GROUPS, boardIdeas, boardItems, isWhyKey, type WhyKey } from './board';
 import { SORT_OPTIONS, loadSort, type SortKey } from './sort';
 import type { Data } from './types';
 
-export type Place = 'board' | 'projects' | 'ideas' | 'built';
+export type Place = 'board' | 'projects' | 'ideas' | 'built' | 'order';
 
 export interface Nav {
   page: Place;
@@ -24,6 +24,7 @@ export const WHERE: { place: Place; label: string; tip: string }[] = [
   { place: 'projects', label: 'Projects', tip: 'Projects: one card per project' },
   { place: 'ideas', label: 'Ideas', tip: 'Ideas: every idea, grouped by why it isn’t planned' },
   { place: 'built', label: 'Built', tip: 'Built: everything built, by day' },
+  { place: 'order', label: 'Build order', tip: 'Build order: what to build first, across every project' },
 ];
 export const placeLabel = (p: Place) => WHERE.find((w) => w.place === p)!.label;
 /** Pages whose What row is the project chips. */
@@ -43,6 +44,7 @@ export function parseHash(hash: string, rememberedSort: () => SortKey = loadSort
   if (parts[0] === 'projects') return { page: 'projects', p: [], q, sort };
   if (parts[0] === 'ideas') return { page: 'ideas', ...(isWhyKey(parts[1]) ? { group: parts[1] } : {}), p, q, sort };
   if (parts[0] === 'built') return { page: 'built', p, q, sort };
+  if (parts[0] === 'order') return { page: 'order', p, q, sort };
   return { page: 'board', p, q, sort }; // also the old #/all
 }
 

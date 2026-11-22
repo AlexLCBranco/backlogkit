@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.5 min (2026-11-21) · longest ~0.8 min (2026-11-21)
 
 ## 2026-11-21
+- BL-23 — Build order: what to build first, across every repo (v1.20.0) (took 9 min, suite 0.5 min)
+  A new "Build order" page in the header lists every planned item in rounds: round 1 "Build these now", round 2 "Build these after round 1", and so on, then "Needs you" and "Waiting for your go"; "Copy order" copies the rounds as text.
 - BL-22 — "Paywall" as a sixth reason an idea isn't planned (v1.19.0) (took 3 min, suite 0.5 min)
   The Ideas page has a new group "Paywall" ("Needs something that costs money."), right after "Waiting on something", and the reason picker offers it.
 - BL-21 — Stuck items say when the thing they wait for has shipped (v1.18.0) (took 7 min, suite 0.6 min)

@@ -237,3 +237,25 @@ button.mark-seen:hover { color: var(--text); }
 .selbar button:hover, .selbar button:focus-visible { border-color: var(--muted); }
 .selbar button[data-copied] { color: var(--ok); border-color: #2c5a3e; }
 .board-page { min-height: calc(100vh - 120px); }
+
+/* BL-23: Build order. Rounds first, then the two piles; an indented row waits for the row above it. */
+.order-page { max-width: 980px; display: flex; flex-direction: column; gap: 12px; }
+.order-box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px 12px; }
+.order-help { margin: 0 0 6px; }
+.order-round h3 { margin: 14px 0 4px; }
+.order-round .round-label { font-weight: 400; margin: 0 6px; }
+.order-list { list-style: none; margin: 0; padding: 0; }
+.order-row { border-top: 1px solid var(--line); padding: 7px 0; }
+.order-row[data-depth]:not([data-depth='0']) { border-left: 2px solid var(--line); padding-left: 10px; }
+.order-row.can-unblock { background: #14291f; border-left: 3px solid var(--ok); padding-left: 8px; border-radius: 4px; }
+.order-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.order-main .id { font-size: 13px; }
+.order-title { font-weight: 500; overflow-wrap: anywhere; }
+.order-short { margin-top: 2px; }
+.order-short .badge { margin: 0; }
+.order-link { margin-top: 2px; font-size: 13px; color: #c9ced8; }
+.order-note { margin-top: 3px; color: var(--warn); }
+button.copy-order { margin-left: 10px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 400; cursor: pointer; vertical-align: 2px; }
+button.copy-order:hover:not(:disabled) { border-color: var(--accent); }
+button.copy-order:disabled { opacity: 0.5; cursor: default; }
+button.copy-order[data-copied] { color: var(--ok); border-color: #2c5a3e; }
