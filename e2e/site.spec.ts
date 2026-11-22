@@ -3,7 +3,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fixtureData } from './fixture-data';
-import { BACKLOG, BUILT, IDEAS } from '../tests/fixtures';
+import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from '../tests/fixtures';
+import { loadAll } from '../lib/github.mjs';
 import { answerBlocked, heldToReady, ideaToHeld, setWhy } from '../lib/moves.mjs';
 import { counts, parseBacklog, parseIdeas } from '../lib/lists.mjs';
 
@@ -469,6 +470,36 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('lane-waiting').getByTestId('board-item')).toHaveCount(1);
     await expect(page.getByTestId('owner')).toHaveText('Owner');
     await expect(page.getByTestId('move')).toHaveCount(0);
+  });
+
+  test('a stuck item naming a built ID says "can be unblocked", in green, first in Stuck (BL-21)', async ({ page }) => {
+    const repos = ['alpha', 'footy', 'halftime'];
+    const { fetchImpl } = mockGithub({
+      repos: repos.map((name) => ({ name })),
+      files: {
+        alpha: { 'FEATURE_BACKLOG.md': '## Ready\n\n### AL-1 — Alpha waits for a person\nBlocked: the owner picks a colour.\n\n### AL-2 — Alpha waits for a planned thing\nBlocked: after HT-2 and HT-9.\n' },
+        footy: { 'FEATURE_BACKLOG.md': '## Held\n\n### FK-61 — Whistle at half time\nBlocked: the owner unblocks it once HT-1 ships.\n' },
+        halftime: { 'FEATURE_BACKLOG.md': '## Ready\n\n### HT-2 — Second half\nText.\n', 'BUILT.md': '## 2026-11-18\n- HT-1 — Half time timer (v1.0.0)\n' },
+      },
+      projectsJson: projectsJson(repos.map((repo) => ({ repo, description: null, url: null, status: 'active', devices: null }))),
+    });
+    const data = await loadAll({ token: 'e2e-secret-token-value', fetchImpl });
+    await page.route('**/api/projects', (r) => r.fulfill({ json: data }));
+    await page.goto('/');
+    const stuck = page.getByTestId('lane-stuck');
+    await expect(stuck.getByTestId('stuck-card').locator('.id')).toHaveText(['FK-61', 'AL-1', 'AL-2']); // footy is after alpha by name, yet first
+    const first = stuck.getByTestId('stuck-card').first();
+    await expect(first.getByTestId('waits')).toHaveText('HT-1 has shipped (halftime, 2026-11-18): this can be unblocked');
+    await expect(first.getByTestId('waits')).toHaveCSS('color', 'rgb(76, 195, 138)'); // green, not the stuck red
+    await expect(first).toHaveCSS('background-color', 'rgb(20, 41, 31)');
+    await expect(stuck.getByTestId('stuck-card').nth(1)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(stuck.getByTestId('stuck-card').nth(1).getByTestId('waits')).toHaveCount(0);
+    await expect(stuck.getByTestId('stuck-card').nth(2).locator('.waits-line')).toHaveText(['Still waiting for HT-2 (planned in halftime)', 'HT-9 was not found in any project']);
+    await expect(page.getByTestId('strip-unblock')).toHaveText('1 can be unblocked');
+    await expect(stuck.locator('h2')).toHaveText('Stuck – needs you 3 · 1 can be unblocked');
+    await page.goto('/#/projects');
+    await expect(page.getByTestId('card-footy').getByTestId('counts')).toContainText('Stuck 1 (1 can be unblocked)');
+    await expect(page.getByTestId('card-alpha').getByTestId('card-unblock')).toHaveCount(0);
   });
 
   test('stuck items: the question shows in red; Answer, empty Save refused, Save sends it and Stuck drops (BL-16)', async ({ page }) => {

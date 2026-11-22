@@ -10,6 +10,7 @@ import { hrefOf, parseHash, titleOf, type Nav } from '../src/nav';
 import { SEEN_STORAGE_KEY, doneKey, loadSeen, markSeen, newCutoff, newDone, saveSeen, LANES, boardIdeas, boardItems, builtCutoff, builtGroups, ideaMatches, laneCounts, laneOf, matches } from '../src/board';
 import type { Data } from '../src/types';
 import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from './fixtures';
+import { waitData } from './wait-fixtures';
 
 let data: Data;
 beforeAll(async () => {
@@ -544,5 +545,40 @@ describe('searching a code explains it at the top (BL-20)', () => {
     cleanup();
     show('#/');
     expect(screen.queryByTestId('code-box')).toBeNull();
+  });
+});
+
+describe('stuck items say when the thing they wait for has shipped (BL-21)', () => {
+  let wd: Data;
+  beforeAll(async () => {
+    wd = await waitData();
+  });
+  const showWait = (hash: string) => render(<Harness d={wd} hash={hash} now={NOW} />);
+  it('"can be unblocked" cards come first in Stuck, in their own colour class, with the plain sentence', () => {
+    showWait('#/');
+    const cards = within(lane('stuck')).getAllByTestId('stuck-card');
+    expect(cards.map((c) => c.querySelector('.id')!.textContent)).toEqual(['FK-61', 'FK-62', 'AL-1', 'AL-2', 'AL-3', 'HT-4']);
+    expect(cards.map((c) => c.classList.contains('can-unblock'))).toEqual([true, true, false, false, false, false]);
+    const waits = (n: number) => [...(cards[n]!.querySelector('[data-testid="waits"]')?.querySelectorAll('.waits-line') ?? [])].map((l) => l.textContent);
+    expect(waits(0)).toEqual(['HT-1 has shipped (halftime, 2026-11-20): this can be unblocked']);
+    expect(waits(2)).toEqual([]); // no ID in its Blocked line: nothing changes
+    expect(waits(3)).toEqual(['HT-1 has shipped (halftime, 2026-11-20)', 'Still waiting for HT-2 (planned in halftime)']);
+    expect(waits(4)).toEqual(['HT-9 was not found in any project']);
+    expect(within(cards[0]!).getByTestId('blocked-note').textContent).toContain('the owner unblocks it once HT-1 ships'); // the question stays
+  });
+  it('the count shows wherever the Stuck number shows: the strip, the lane heading and the project card', () => {
+    showWait('#/');
+    expect(screen.getByTestId('strip-unblock').textContent).toBe('2 can be unblocked');
+    expect(lane('stuck').querySelector('h2')!.textContent).toBe('Stuck – needs you 6 · 2 can be unblocked');
+    cleanup();
+    showWait('#/projects');
+    expect(within(screen.getByTestId('card-footy')).getByTestId('counts').textContent).toBe('Stuck 2 (2 can be unblocked) · Will be built next 1 · Waiting for your OK 0 · Ideas 1');
+    expect(within(screen.getByTestId('card-alpha')).getByTestId('counts').textContent).toBe('Stuck 3 · Will be built next 0 · Waiting for your OK 0 · Ideas 0');
+  });
+  it('nothing can be unblocked: no count anywhere', () => {
+    show('#/');
+    expect(screen.queryByTestId('strip-unblock')).toBeNull();
+    expect(screen.queryByTestId('lane-unblock')).toBeNull();
+    expect(screen.queryAllByTestId('waits')).toEqual([]);
   });
 });

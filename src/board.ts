@@ -10,6 +10,7 @@
 import type { BlockedNote, BuiltItem, Data, Estimate, Idea, PlannedItem, Project, Section, Why } from './types';
 import { sortProjects, type SortKey } from './sort';
 import { itemMarkdown } from '../lib/lists.mjs';
+import { codeIndex, unblockFirst, waitsFor, type CodeIndex, type Waits } from './waits';
 
 export type Lane = 'stuck' | 'next' | 'waiting' | 'ideas' | 'done';
 export const LANES: { key: Lane; label: string; empty: string }[] = [
@@ -54,6 +55,8 @@ export interface BoardItem {
   short: string | null;
   /** The Blocked note: the question for the owner (BL-16); null when not blocked. */
   blockedNote: BlockedNote | null;
+  /** What a stuck item waits for (BL-21): the item IDs its Blocked note names, looked up in every repo; null when none. */
+  waits: Waits | null;
   /** What opens in place: the full spec, or the built item's sentence. */
   body: string;
   blocked: boolean;
@@ -85,7 +88,7 @@ export function laneOf(section: 'ready' | 'held', blocked: boolean): 'stuck' | '
   return section === 'ready' ? 'next' : 'waiting';
 }
 
-const planned = (repo: string, section: 'ready' | 'held', i: PlannedItem, n: number): BoardItem => ({
+const planned = (repo: string, section: 'ready' | 'held', i: PlannedItem, n: number, index: CodeIndex): BoardItem => ({
   key: `${repo}:plan:${n}`,
   lane: laneOf(section, i.blocked),
   section,
@@ -95,6 +98,7 @@ const planned = (repo: string, section: 'ready' | 'held', i: PlannedItem, n: num
   version: null,
   short: i.short ?? null,
   blockedNote: i.blockedNote ?? null,
+  waits: i.blocked ? waitsFor(i.blockedNote?.text, i.id, repo, index) : null,
   body: i.body,
   blocked: i.blocked,
   date: null,
@@ -112,6 +116,7 @@ const built = (repo: string, date: string, i: BuiltItem, n: number): BoardItem =
   version: i.version ?? null,
   short: null,
   blockedNote: null,
+  waits: null,
   body: i.detail,
   blocked: false,
   date,
@@ -129,11 +134,13 @@ const plannedSections = (p: Project) => p.planned.filter((s): s is Section & { k
  */
 export function boardItems(data: Data, sort: SortKey, cutoff: string | null): BoardItem[] {
   const projects: Project[] = sortProjects(data.projects, sort);
-  const out: BoardItem[] = [];
+  const index = codeIndex(data);
+  const plan: BoardItem[] = [];
   for (const p of projects) {
     let n = 0;
-    for (const s of plannedSections(p)) for (const i of s.items) out.push(planned(p.repo, s.kind, i, n++));
+    for (const s of plannedSections(p)) for (const i of s.items) plan.push(planned(p.repo, s.kind, i, n++, index));
   }
+  const out = unblockFirst(plan); // BL-21: stuck items that can be unblocked come first in Stuck
   // Done: newest day first; within a day, projects in card order, each file's order kept.
   const days = new Set<string>();
   for (const p of projects) for (const d of p.built) if (!cutoff || d.date >= cutoff) days.add(d.date);
@@ -154,6 +161,17 @@ export function laneCounts(items: BoardItem[], ideas: BoardIdea[]): Record<Lane,
   const c: Record<Lane, number> = { stuck: 0, next: 0, waiting: 0, ideas: ideas.length, done: 0 };
   for (const i of items) c[i.lane]++;
   return c;
+}
+
+/** How many stuck items can be unblocked (BL-21): shown wherever the Stuck number is. */
+export const unblockCount = (items: BoardItem[]) => items.filter((i) => i.lane === 'stuck' && i.waits?.ready).length;
+export const unblockText = (n: number) => `${n} can be unblocked`;
+
+/** One project's stuck items that can be unblocked (its card on the Projects page). */
+export function projectUnblockCount(p: Project, index: CodeIndex): number {
+  let n = 0;
+  for (const s of plannedSections(p)) for (const i of s.items) if (i.blocked && waitsFor(i.blockedNote?.text, i.id, p.repo, index)?.ready) n++;
+  return n;
 }
 
 /** One project's planned lanes and ideas (its card on the Projects page). */
