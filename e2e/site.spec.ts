@@ -695,7 +695,7 @@ test('live: real projects load from GitHub', async ({ page }) => {
   test.skip(!live, 'live only');
   await page.goto('/');
   await expect(page.getByTestId('lane-next')).toBeVisible({ timeout: 20_000 });
-  await expect.poll(() => heads(page)).toEqual([/^Stuck – needs you \d+$/, /^Will be built next \d+$/, /^Waiting for your OK \d+$/, /^Ideas \d+$/, /^Done \d+$/].map((r) => expect.stringMatching(r)));
+  await expect.poll(() => heads(page)).toEqual([/^Stuck – needs you \d+( · \d+ can be unblocked)?$/, /^Will be built next \d+$/, /^Waiting for your OK \d+$/, /^Ideas \d+$/, /^Done \d+$/].map((r) => expect.stringMatching(r)));
   await expect(page.getByTestId('strip').locator('b')).toHaveCount(5);
   await page.goto('/#/projects');
   await expect(page.getByTestId('card-backlogkit')).toBeVisible({ timeout: 20_000 });

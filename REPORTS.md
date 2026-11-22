@@ -26,6 +26,8 @@ Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backl
 - BL-21's code was pushed (cdcb617) before its list updates: the script editing the `.md` files failed on Windows
   line endings and the commit ran anyway. CI's version check fails on that one commit (1.18.0 had no `BUILT.md`
   line). The next commit (30e56fb) added the lists, report and rule text. History was not rewritten.
+- CI's live check failed after BL-21 went live: it expected the Stuck heading to be only "Stuck – needs you N", and
+  the live site now says "Stuck – needs you 3 · 1 can be unblocked". The check was fixed in a test-only commit.
 
 **Tests:** 201 unit + 34 e2e pass locally (suite 0.5 min). New: paywall reads as a valid reason and is second in the
 list; setting it writes the tag; a page test; one e2e with a fixture repo (idea under "Paywall", picker offers and
