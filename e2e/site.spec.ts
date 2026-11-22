@@ -350,7 +350,7 @@ test.describe('mocked GitHub', () => {
     await page.goto('/');
     await page.getByRole('link', { name: 'Ideas', exact: true }).click();
     await expect(page).toHaveURL(/#\/ideas$/);
-    await expect(page.locator('[data-testid^="why-"] h3')).toHaveText(['Needs your decision 1', 'Waiting on something 0', 'Too big, needs splitting 0', 'Not important yet 0', 'No reason yet 2', 'Maybe never 0']);
+    await expect(page.locator('[data-testid^="why-"] h3')).toHaveText(['Needs your decision 1', 'Waiting on something 0', 'Paywall 0', 'Too big, needs splitting 0', 'Not important yet 0', 'No reason yet 2', 'Maybe never 0']);
     const decision = page.getByTestId('why-decision');
     await expect(decision.locator('.idea-main')).toHaveText('Unassigned U-1 Orphan gadget for no repo');
     await expect(decision.getByTestId('idea-note')).toHaveText('2026-11-18');
@@ -385,8 +385,44 @@ test.describe('mocked GitHub', () => {
     await expect(pick).toHaveValue('none');
     await pick.selectOption({ label: 'Too big, needs splitting' });
     await expect(page.getByTestId('why-too-big').locator('.idea-main')).toContainText('Something long that wraps');
-    await expect(page.locator('[data-testid^="why-"] h3')).toHaveText(['Needs your decision 1', 'Waiting on something 0', 'Too big, needs splitting 1', 'Not important yet 0', 'No reason yet 1', 'Maybe never 0']);
+    await expect(page.locator('[data-testid^="why-"] h3')).toHaveText(['Needs your decision 1', 'Waiting on something 0', 'Paywall 0', 'Too big, needs splitting 1', 'Not important yet 0', 'No reason yet 1', 'Maybe never 0']);
     expect(sent).toEqual([{ action: 'reason', repo: 'demo', id: 'I-2', why: 'too-big' }]);
+  });
+
+  test('an idea tagged paywall shows under "Paywall"; the reason picker offers "Paywall" and sends it (BL-22)', async ({ page }) => {
+    let ideas = '# Ideas\n\n- I-15 — Bookmaker odds (2026-11-21) [why: paywall]\n- I-16 — Live odds\n  feed (2026-11-21) [why: waiting]\n';
+    const { fetchImpl } = mockGithub({
+      repos: [{ name: 'footy' }],
+      files: { footy: { 'FEATURE_BACKLOG.md': '## Ready\n', 'IDEAS.md': ideas } },
+      projectsJson: projectsJson([{ repo: 'footy', description: null, url: null, status: 'active', devices: null }]),
+    });
+    const data = { ...(await loadAll({ token: 'e2e-secret-token-value', fetchImpl })), canMove: true };
+    const sent: unknown[] = [];
+    await page.route('**/api/projects', (r) => r.fulfill({ json: data }));
+    await page.route('**/api/move', async (r) => {
+      const body = r.request().postDataJSON();
+      if (body.action === 'check') return r.fulfill({ json: { ok: true } });
+      sent.push(body);
+      ideas = setWhy(ideas, body.id, body.why).ideas;
+      return r.fulfill({ json: { ok: true, message: 'ok', updates: [{ repo: 'footy', ideas: parseIdeas(ideas) }] } });
+    });
+    await page.addInitScript(() => localStorage.setItem('backlogkit.owner', 'pw'));
+    await page.goto('/#/ideas');
+    await expect(page.locator('[data-testid^="why-"] h3')).toHaveText(['Needs your decision 0', 'Waiting on something 1', 'Paywall 1', 'Too big, needs splitting 0', 'Not important yet 0', 'No reason yet 0', 'Maybe never 0']);
+    const paywall = page.getByTestId('why-paywall');
+    await expect(paywall.getByTestId('reason-hint')).toHaveText('Needs something that costs money.');
+    await expect(paywall.locator('.idea-main')).toContainText('I-15 Bookmaker odds');
+    await expect(page.getByLabel('Reason for I-15')).toHaveValue('paywall');
+    const pick = page.getByLabel('Reason for I-16');
+    await expect(pick.locator('option')).toHaveText(['Needs your decision', 'Waiting on something', 'Paywall', 'Too big, needs splitting', 'Not important yet', 'No reason yet', 'Maybe never']);
+    await pick.selectOption({ label: 'Paywall' });
+    await expect(paywall.locator('h3')).toHaveText('Paywall 2');
+    expect(sent).toEqual([{ action: 'reason', repo: 'footy', id: 'I-16', why: 'paywall' }]);
+    expect(ideas).toContain('feed (2026-11-21) [why: paywall]');
+    // The home page's Ideas lane has a Paywall row that opens the group.
+    await page.goto('/');
+    await page.getByTestId('lane-ideas').getByTestId('ideas-row').filter({ hasText: 'Paywall' }).click();
+    await expect(page).toHaveURL(/#\/ideas\/paywall$/);
   });
 
   test('time estimates on the home page: item badges, lane totals only where estimated, measured times (BL-8, BL-12)', async ({ page }) => {

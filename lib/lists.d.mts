@@ -7,7 +7,7 @@ export interface BlockedNote { text: string; date: string | null }
 export interface Section { name: string; kind: SectionKind; items: PlannedItem[] }
 export interface BuiltItem { id: string | null; title: string; text: string; detail: string; markdown: string; version: string | null; took: Estimate | null }
 export interface BuiltDay { date: string; items: BuiltItem[] }
-export type Why = 'waiting' | 'decision' | 'too-big' | 'later' | 'never'
+export type Why = 'waiting' | 'paywall' | 'decision' | 'too-big' | 'later' | 'never'
 export interface Idea { id: string | null; title: string; text: string; note: string | null; why: Why | null; badWhy: string | null }
 export const WHY: Why[]
 export function splitIdea(title: string): { text: string; note: string | null; why: Why | null; badWhy: string | null }

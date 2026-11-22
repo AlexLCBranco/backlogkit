@@ -568,7 +568,7 @@ function ReasonSelect({ bi }: { bi: BoardIdea }) {
         }}
       >
         {WHY_GROUPS.map((g) => (
-          <option key={g.key} value={g.key}>{g.label}</option>
+          <option key={g.key} value={g.key} title={g.hint}>{g.label}</option>
         ))}
       </select>
       {err && <span className="error move-error" role="alert" data-testid="move-error">{err}</span>}
@@ -596,7 +596,7 @@ function IdeaRow({ bi, targets }: { bi: BoardIdea; targets: string[] }) {
 
 /**
  * Every idea in one place (BL-7), grouped by why it isn't planned (BL-17): Needs your decision, Waiting on something,
- * Too big, Not important yet, No reason yet, Maybe never (folded). Unassigned ideas are in it with their own label.
+ * Paywall (BL-22), Too big, Not important yet, No reason yet, Maybe never (folded). Unassigned ideas are in it with their own label.
  * `group` (from #/ideas/<group>) scrolls to that group and opens it.
  */
 export function IdeasPage({ data, group, selected, sort }: { data: Data; group?: WhyKey; selected: string[]; sort: SortKey }) {
@@ -609,9 +609,12 @@ export function IdeasPage({ data, group, selected, sort }: { data: Data; group?:
     <div className="ideas-page">
       {groups.map((g) => {
         const head = (
-          <h3>
-            {g.label} <span className="muted count">{g.ideas.length}</span>
-          </h3>
+          <>
+            <h3>
+              {g.label} <span className="muted count">{g.ideas.length}</span>
+            </h3>
+            {g.hint && <p className="muted why-hint" data-testid="reason-hint">{g.hint}</p>}
+          </>
         );
         const list = g.ideas.length ? (
           <ul className="idea-list">

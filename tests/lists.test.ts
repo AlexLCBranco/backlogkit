@@ -65,6 +65,11 @@ describe('idea reasons and end notes (BL-17)', () => {
   it('reads each tag, takes it off the shown text, keeps the full line in title', () => {
     for (const why of WHY) expect(parseIdeas(`- I-1 — Thing (2026-11-01) [why: ${why}]\n`)[0]).toMatchObject({ text: 'Thing', note: '2026-11-01', why, badWhy: null, title: `Thing (2026-11-01) [why: ${why}]` });
   });
+  it('paywall is a valid reason, second in the reasons list (BL-22)', () => {
+    expect(WHY).toEqual(['waiting', 'paywall', 'decision', 'too-big', 'later', 'never']);
+    expect(parseIdeas('- I-15 — Bookmaker odds (2026-11-21) [why: paywall]\n')[0]).toMatchObject({ text: 'Bookmaker odds', note: '2026-11-21', why: 'paywall', badWhy: null });
+    expect(parseIdeas('- U-3 — Paid thing [why: Paywall]\n')[0]).toMatchObject({ why: 'paywall', badWhy: null });
+  });
   it('no tag → why null; an unknown tag → why null and badWhy set', () => {
     expect(parseIdeas('- I-1 — Thing\n')[0]).toMatchObject({ text: 'Thing', note: null, why: null, badWhy: null });
     expect(parseIdeas('- I-1 — Thing [why: someday]\n')[0]).toMatchObject({ text: 'Thing', why: null, badWhy: 'someday' });

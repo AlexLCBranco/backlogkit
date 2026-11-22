@@ -109,8 +109,12 @@ describe('setting an idea reason (BL-17)', () => {
     expect(setWhy(T, 'I-2', 'none').ideas).toBe(T.replace(' [why: later]', ''));
     expect(setWhy(T, 'I-2', 'later').changed).toBe(false);
   });
+  it('setting an idea to paywall writes [why: paywall] (BL-22)', () => {
+    expect(setWhy(T, 'I-1', 'paywall')).toEqual({ ideas: T.replace('One (2026-11-01)', 'One (2026-11-01) [why: paywall]'), changed: true });
+    expect(setWhy(T, 'I-2', 'paywall').ideas).toBe(T.replace('[why: later]', '[why: paywall]'));
+  });
   it('refuses an unknown reason or idea', () => {
-    expect(REASONS).toEqual(['waiting', 'decision', 'too-big', 'later', 'never', 'none']);
+    expect(REASONS).toEqual(['waiting', 'paywall', 'decision', 'too-big', 'later', 'never', 'none']);
     expect(() => setWhy(T, 'I-1', 'someday')).toThrow(/not a reason/);
     expect(() => setWhy(T, 'I-9', 'later')).toThrow(/I-9 is not in the ideas file/);
   });

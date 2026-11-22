@@ -197,6 +197,7 @@ details.why-group > summary { cursor: pointer; list-style: none; }
 details.why-group > summary::-webkit-details-marker { display: none; }
 details.why-group > summary h3::before { content: '▸ '; color: var(--muted); }
 details.why-group[open] > summary h3::before { content: '▾ '; }
+.why-group .why-hint { margin: -2px 0 6px; font-size: 13px; }
 .why-group .empty { margin: 0 0 4px; font-size: 13px; }
 ul.idea-list li { margin: 6px 0; list-style: none; }
 ul.idea-list { padding-left: 0; }

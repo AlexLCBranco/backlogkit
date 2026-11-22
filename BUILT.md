@@ -2,9 +2,11 @@
 
 Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never here.
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
-Suite time: last ~0.6 min (2026-11-21) · longest ~0.8 min (2026-11-21)
+Suite time: last ~0.5 min (2026-11-21) · longest ~0.8 min (2026-11-21)
 
 ## 2026-11-21
+- BL-22 — "Paywall" as a sixth reason an idea isn't planned (v1.19.0) (took 3 min, suite 0.5 min)
+  The Ideas page has a new group "Paywall" ("Needs something that costs money."), right after "Waiting on something", and the reason picker offers it.
 - BL-21 — Stuck items say when the thing they wait for has shipped (v1.18.0) (took 7 min, suite 0.6 min)
   A stuck item whose `Blocked:` line names another item (like HT-1) now says "HT-1 has shipped (halftime-timer, <day>): this can be unblocked" in green and moves to the top of Stuck; the Stuck number says how many can be unblocked.
 - BL-20 — Searching a feature code explains it at the top (v1.17.0) (took 9 min, suite 0.6 min)

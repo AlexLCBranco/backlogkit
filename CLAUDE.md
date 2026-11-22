@@ -79,6 +79,7 @@ backlogkit (the owner's site that shows every repo's lists) reads these lines; k
   then says when it has shipped.
 - Ideas: every idea in `IDEAS.md` ends with one reason tag saying why it isn't planned: `[why: waiting]` waits on
   something (a data source, a key or account, another feature, an outside event; the idea's text says which),
+  `[why: paywall]` needs something that costs money (paid data, a paid API, a paid plan);
   `[why: decision]` needs the owner to decide something, `[why: too-big]` needs splitting first, `[why: later]` not
   important yet, `[why: never]` probably never. Tag only from what the owner said; if he gave no reason, leave the tag
   off (backlogkit shows it under "No reason yet"). The owner can also set it from backlogkit.

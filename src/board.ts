@@ -22,9 +22,10 @@ export const LANES: { key: Lane; label: string; empty: string }[] = [
 ];
 /** Idea groups by why they're not planned (BL-17), in page order; "Maybe never" last and folded. */
 export type WhyKey = Why | 'none';
-export const WHY_GROUPS: { key: WhyKey; label: string; folded?: boolean }[] = [
+export const WHY_GROUPS: { key: WhyKey; label: string; hint?: string; folded?: boolean }[] = [
   { key: 'decision', label: 'Needs your decision' },
   { key: 'waiting', label: 'Waiting on something' },
+  { key: 'paywall', label: 'Paywall', hint: 'Needs something that costs money.' }, // BL-22
   { key: 'too-big', label: 'Too big, needs splitting' },
   { key: 'later', label: 'Not important yet' },
   { key: 'none', label: 'No reason yet' },

@@ -2,6 +2,38 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-21 — BL-22
+
+**Built**
+- BL-22 — "Paywall" as a sixth reason an idea isn't planned (v1.19.0). `[why: paywall]` is read from `IDEAS.md`
+  and `UNASSIGNED_IDEAS.md`, has its own group "Paywall" on the Ideas page with the line "Needs something that
+  costs money." under its name, its own row in Home's Ideas lane, its own address (`#/ideas/paywall`), and is in the
+  owner's reason picker (which writes `[why: paywall]`). No idea was retagged.
+- Rule text added to this repo's CLAUDE.md ("backlogkit formats", Ideas bullet).
+
+**Decided without the spec saying** (say if you want it changed)
+- The reasons list (what the files accept) is in the spec's order: waiting, paywall, decision, too-big, later,
+  never. The Ideas page keeps the order it had (Needs your decision first, Maybe never last and folded) with Paywall
+  put right after "Waiting on something".
+- The other five groups have no explanation line; only Paywall got one, as specified.
+
+**For you / the Claude chat**
+- Retag footykit's I-15 and I-16 to `[why: paywall]` now that this is live.
+- Other repos that need the same paywall sentence in "backlogkit formats" → Ideas (not edited from here): footykit,
+  gauntlet, calendarkit, boardkit, rotationkit, halftime-timer, statmuse-builder, linkkit.
+
+**Went wrong in this run**
+- BL-21's code was pushed (cdcb617) before its list updates: the script editing the `.md` files failed on Windows
+  line endings and the commit ran anyway. CI's version check fails on that one commit (1.18.0 had no `BUILT.md`
+  line). The next commit (30e56fb) added the lists, report and rule text. History was not rewritten.
+
+**Tests:** 201 unit + 34 e2e pass locally (suite 0.5 min). New: paywall reads as a valid reason and is second in the
+list; setting it writes the tag; a page test; one e2e with a fixture repo (idea under "Paywall", picker offers and
+sends it). Three old expectations gained "Paywall" in their lists.
+
+**Blocked:** none. **Ideas added:** none.
+**Test by hand:** nothing needed.
+
 ## 2026-11-21 — BL-21
 
 **Built**

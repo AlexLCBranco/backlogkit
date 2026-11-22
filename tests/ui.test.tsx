@@ -334,7 +334,7 @@ describe('ideas page (BL-7, grouped by reason in BL-17)', () => {
   const groupHeads = () => screen.getAllByTestId(/^why-/).map((g) => g.querySelector('h3')!.textContent);
   it('groups every idea by reason, in order, each with its count; Maybe never last and folded', () => {
     show('#/ideas');
-    expect(groupHeads()).toEqual(['Needs your decision 0', 'Waiting on something 0', 'Too big, needs splitting 0', 'Not important yet 0', 'No reason yet 2', 'Maybe never 1']);
+    expect(groupHeads()).toEqual(['Needs your decision 0', 'Waiting on something 0', 'Paywall 0', 'Too big, needs splitting 0', 'Not important yet 0', 'No reason yet 2', 'Maybe never 1']);
     const never = screen.getByTestId('why-never') as HTMLDetailsElement;
     expect(never.tagName).toBe('DETAILS');
     expect(never.open).toBe(false);
@@ -439,7 +439,7 @@ describe('one-click moves (BL-11)', () => {
     showAs(o, '#/ideas');
     const pick = screen.getByLabelText('Reason for I-2') as HTMLSelectElement;
     expect(pick.value).toBe('none');
-    expect([...pick.options].map((x) => x.textContent)).toEqual(['Needs your decision', 'Waiting on something', 'Too big, needs splitting', 'Not important yet', 'No reason yet', 'Maybe never']);
+    expect([...pick.options].map((x) => x.textContent)).toEqual(['Needs your decision', 'Waiting on something', 'Paywall', 'Too big, needs splitting', 'Not important yet', 'No reason yet', 'Maybe never']);
     fireEvent.change(pick, { target: { value: 'too-big' } });
     await waitFor(() => expect(moves).toEqual([{ action: 'reason', repo: 'demo', id: 'I-2', why: 'too-big' }]));
     const un = screen.getByLabelText('Reason for U-1') as HTMLSelectElement;
@@ -580,5 +580,22 @@ describe('stuck items say when the thing they wait for has shipped (BL-21)', () 
     expect(screen.queryByTestId('strip-unblock')).toBeNull();
     expect(screen.queryByTestId('lane-unblock')).toBeNull();
     expect(screen.queryAllByTestId('waits')).toEqual([]);
+  });
+});
+
+describe('"Paywall" as a sixth reason (BL-22)', () => {
+  it('an idea tagged paywall shows under Paywall, with its one-line explanation; no other group has one', () => {
+    const d: Data = { ...data, projects: data.projects.map((p) => (p.repo === 'demo' ? { ...p, ideas: [...p.ideas, { id: 'I-15', title: 'Bookmaker odds [why: paywall]', text: 'Bookmaker odds', note: null, why: 'paywall' as const, badWhy: null }] } : p)) };
+    render(<Harness d={d} hash="#/ideas" now={NOW} />);
+    const group = screen.getByTestId('why-paywall');
+    expect(group.querySelector('h3')!.textContent).toBe('Paywall 1');
+    expect(within(group).getByTestId('reason-hint').textContent).toBe('Needs something that costs money.');
+    expect(within(group).getAllByTestId('idea').map((i) => i.querySelector('.idea-main')!.textContent)).toEqual(['demo I-15 Bookmaker odds']);
+    expect(screen.getAllByTestId('reason-hint')).toHaveLength(1);
+    expect(screen.getAllByTestId(/^why-/).map((g) => g.dataset.testid)).toEqual(['why-decision', 'why-waiting', 'why-paywall', 'why-too-big', 'why-later', 'why-none', 'why-never']);
+  });
+  it('#/ideas/paywall is an address of its own', () => {
+    expect(parseHash('#/ideas/paywall')).toMatchObject({ page: 'ideas', group: 'paywall' });
+    expect(parseHash(hrefOf(parseHash('#/ideas/paywall')))).toMatchObject({ page: 'ideas', group: 'paywall' });
   });
 });
