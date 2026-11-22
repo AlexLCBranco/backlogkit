@@ -17,64 +17,40 @@ Spec: `PLAN.md`, "Queued", item 6.
 
 ### Ready
 
-#### CK-22 — Countdown to the Slate's first game (halftime-timer)
-**In short:** The Slate gets a "⏱ Countdown" button that opens halftime-timer with a timer counting down to the day's first tip-off.
-**What:**
-- Button in the Slate header (site and, through the package, the gauntlet Slate widget). Opens halftime-timer in a new tab with an end-time timer set to the first game's start, named e.g. "First game · BOS @ DET 20:00".
-- If the first game has already started, it counts to the next game that hasn't, and the timer name says so ("Next game · …"). If none is left: button disabled, tooltip "No more games today".
-- Uses the link format from halftime-timer HT-1.
-Blocked: waits for halftime-timer HT-1 (its link format and live URL); the owner unblocks it once HT-1 ships.
-**Tests:** unit: first / next not-started game, link built correctly; e2e: the button's link points to halftime-timer with the right time and name.
+#### CK-35 — Season-series popup: past-season games are clickable
+**In short:** In the season-series popup, every game of an earlier season opens that game's date on NBA.com in a new tab, instead of being a dead square.
+**What:** today the past-season squares (`PastSquare` in `src/slate/series.tsx`: regular season, play-in and playoff games) have no link, because ESPN's past-season data has no NBA game id, so there is no hoopsjunkie page to point to. Owner's rule (2026-11-19, confirmed 2026-11-22): when hoopsjunkie isn't available, the game links to NBA.com. Make the whole square a link, new tab, to NBA.com's games page for the game's date, the same link the NBA History page already uses (`pastGameUrl` in `src/data/nbaHistory.ts`, `https://www.nba.com/games?date=YYYY-MM-DD`). Same hover look as this season's squares (no underline), title "Open on NBA.com". This season's squares keep their hoopsjunkie link. The link must work everywhere the popup shows, including the Slate kit the gauntlet loads (gauntlet GT-22).
+**Tests:** e2e: switch the popup to an earlier season; every regular-season, play-in and playoff square is a link to `nba.com/games?date=` with that game's date, opening in a new tab; this season's squares still link to hoopsjunkie.
 
-## footykit
+#### CK-36 — Holiday / big-date label opens that day's Slate
+**In short:** Clicking a holiday or big-date label (Thanksgiving, Christmas, MLK Day, Cup knockout nights...) anywhere in the app opens the league Slate for that day.
+**What:** today the label (`BigDayLabel` in `src/slate/bigDay.tsx`, added in CK-32) is plain text with a hover sentence. Make it a link to the league Slate of its date, same tab, pushed to history so the back arrow returns to where the owner was. Applies everywhere the label shows: team calendar cells (`TeamMonthGrid`), the month navigator (`MonthNavigator`), the league week view (`LeagueWeekView`) and the league list day heading (`LeagueListView`). In a team view the click leaves the team and goes to the league Slate (all games of that day). The label in the Slate's own header (`SlateCard`) is already on that day: it stays as it is, not a link (also the case inside the gauntlet's Slate widget, which is pinned to its date). Keep the hover sentence; pointer cursor, no underline on hover (owner dislikes it). The click must not also trigger the cell/day click behind it. The star on game cards (`BigDayMark`) is not part of this item.
+**Tests:** e2e: in a team calendar, the league week view and the league list, click a big-day label; the league Slate opens on that label's date; browser back returns to the previous view. The Slate header's label is not a link.
 
-### Ready
-
-#### FK-61 — Countdown to the Slate's first match (halftime-timer)
-**In short:** The Slate gets a "⏱ Countdown" button that opens halftime-timer with a timer counting down to the day's first match.
-**What:**
-- Button in the Slate header. Opens halftime-timer in a new tab with an end-time timer set to the first match's kickoff, named e.g. "First match · Arsenal–Chelsea 16:30".
-- If the first match has already started, it counts to the next match that hasn't, and the timer name says so ("Next match · …"). If none is left: button disabled, tooltip "No more matches today".
-- Uses the link format from halftime-timer HT-1.
-Blocked: waits for halftime-timer HT-1 (its link format and live URL); the owner unblocks it once HT-1 ships.
-**Tests:** unit: picking the first / next not-started match, link built correctly; e2e: the button's link points to halftime-timer with the right time and name.
-
-#### FK-63 — Pregame odds on past World Cup matches, and random resimulation
-**In short:** Past World Cup matches show the pregame odds (decimal), and the simulator gets a "Resimulate randomly" button that plays matches using those odds.
-**What:**
-- From I-13. Odds: 1X2 pregame (closing if that's what the source has), decimal, shown on the match square hover and in the match detail; never on the copy-as-image unless there already is an odds spot.
-- Source: free only. Check what free sources really cover (e.g. FootyStats' World Cup downloads, OddsPapi's free tier, openly published odds datasets); The Odds API's history is paid, so not that. Odds likely exist only for recent editions (roughly 2002 on); editions without them show no odds, never made-up ones.
-- Resimulate randomly: in FK-60's simulator, plays every match (or only the ones not fixed by hand) with win/draw/loss chances from the pregame odds (margin removed). Knockout draws go to a 50/50 shoot-out. Button stays hidden for editions without odds (equal odds would be meaningless). "Run again" re-rolls; "Reset to real results" as in FK-60.
-- If no free source covers any edition: stop, add a `Blocked:` note with what was checked, and report.
-**Answered (2026-11-20):** Which odds source (Footiqo manual export, an OddsPapi key, or FootyStats samples)? → The owner exports the World Cup odds CSV from Footiqo by hand.
-**Answered (2026-11-20):** What are "qualifying odds"? → Each knockout tie shows both teams' odds to go through (full time, extra time or penalties), in decimals.
-**Answered (2026-11-20):** How are pairings that never really happened played in the random resim? → The team with the better pre-tournament odds to win the World Cup goes through (those outright odds are also an important stat to show).
-**Answered (2026-11-20):** Where do the odds show? → On screen at all times, more on hover; team names open a team page with its results at previous World Cups.
-**Answered (2026-11-20):** Build on FiveThirtyEight's 2018 and 2022 model forecasts instead? → No: keep it blocked until bookmaker odds can be published.
-Blocked: no publishable source of bookmaker odds found (checked 2026-11-20). Footiqo's export (kept locally in data/odds/, git-ignored) is personal, non-commercial use only. Hugging Face's World Cup odds set: licence "other", free sample 7 matches. SharpAPI (CC BY 4.0): one 2026 snapshot from semi-final week only. Usable instead: FiveThirtyEight's forecasts (CC BY 4.0, via the Wayback Machine) for 2018 and 2022: every match's win / draw / loss chances before kick-off and each team's pre-tournament chance to win the cup. These are model chances, not bookmaker odds; they'd show as decimal "fair odds" (1 ÷ chance), labelled as 538's. Nothing open found for 2026. Waits for a publishable source of bookmaker odds.
-**Tests:** unit: odds → probabilities (margin removed, sum 1); random resim with a fixed seed gives a fixed bracket; editions without odds hide the button; e2e: hover a 2022 match shows odds; resimulate changes the bracket.
-
-#### FK-68 — FIFA+ full-match links on 2022 World Cup matches
-**In short:** Every 2022 World Cup match with a free full replay on FIFA's own site gets a ▶ link that opens it.
-**What:**
-- Same ▶ as FK-67, same places, on the 2022 edition. Title: "Full match on FIFA+". The Google link on the score stays.
-- Target: the match's "Full Match Replay" page on FIFA+ (seen from chat on 2026-11-20: the final is at `https://www.fifa.com/en/watch/Ar2sZ_9GHkie8SDq2Mt4gg`, 2h38). The page IDs are random, so each match needs its real URL: never a built or guessed one.
-- Fallback, only when a match has no FIFA+ replay page: FIFA's official YouTube "FULL MATCH" upload of it (the final is `https://www.youtube.com/watch?v=RgqKdplLIk4`), title "Full match on FIFA's YouTube". Neither exists: no ▶.
-- Data: `public/worldcup/2022-videos.json`, match number → full URL, built by a script. Share one file shape and one ▶ component with FK-67 (if FK-67 stored YouTube IDs only, widen it to full URLs).
-- Not known from chat: how to list the 64 replay pages (FIFA+ is script-rendered; look for a public listing, API or sitemap), whether all 64 exist, and whether playback needs a sign-in or is region-limited. The script prints which matches have no link.
-- If the pages can't be listed automatically: stop, add a `Blocked:` note with what was tried, and report.
-Blocked: the 64 replay pages could not be listed (tried 2026-11-20). fifa.com's robots.txt names a sitemap at `https://cxm-api.fifa.com/fifaplusweb/api/sitemaps`, and each replay page loads its data from that same host (`…/api/pages/en/watch/<id>`, `…/api/sections/videoDetails/<id>`), but Claude Code's permission guard refused every read of cxm-api.fifa.com (curl and the browser), so nothing could be listed. The 2022 tournament page on fifa.com links to no replay. Seen on the way: the final's page plays in the browser with no sign-in (from Brazil). To unblock: allow Claude Code to read cxm-api.fifa.com (a permission rule), or say to use FIFA's YouTube "FULL MATCH" uploads for all 64 instead.
-**Tests:** unit: a match with a FIFA+ URL uses it, one with only a YouTube URL uses that with the other title, one with neither renders no ▶; e2e: the 2022 final has a ▶ whose href is the FIFA+ replay page; data check: every URL in the file answers 200. By hand (can't be automated): open one ▶ and confirm the full match plays without paying.
+#### CK-37 — Cup Groups page fits the owner's real window with no scroll bar
+**In short:** The Cup Groups page (six groups, "Who advances" and the wild card race) fits on one screen again with no page scroll bar, by cutting dead space, not by shrinking the content.
+**What:** standing rule (2026-10-31): the Cup page must never need scrolling to see its end. It broke on the owner's real window: his browser's page area is about 1918 × 914 (screenshot of v1.94.0, 2026-11-22), and there the wild card race is cut after its 5th row and the page scrolls. The fit test (`e2e/cup.spec.ts`, "Cup view fits the window") only checks 1920 × 950 and 1600 × 1000, both taller than his window, so it kept passing. Fix: make the whole Groups page (`src/components/CupView.tsx`) fit at 1920 × 900 with every wild card row visible. Take the height from dead space first: the gaps between team rows, between the two rows of groups and between groups and the bottom panels, card and panel padding, the heading rows, and the "Who advances" text panel (tighter line spacing / paragraph gaps; it may get more of the width). Do not shrink team names, the game squares or the W / L / DIFF numbers, and do not remove any content. Nothing in the app's header changes.
+**Tests:** e2e: add 1920 × 900 to the sizes of "Cup view fits the window" (real data and the all-played worst case): no page scroll, nothing below the window, nothing clipped, all wild card rows visible. The existing sizes keep passing; the font sizes of team names and game squares are the same as before this item.
 
 ## gauntlet
 
 ### Ready
 
-#### GT-14 — Football Slate and combined Slate widgets
-**In short:** Two new Slate widgets on the whiteboard: football only, and football plus NBA together in time order.
-**What:** next to the NBA Slate widget, a Football Slate widget (footykit's Slate) and a Combined Slate: one Slate with both sports' games sorted by start time, a small sport mark on each card. Each can be placed on its own (NBA only, Football only, Combined). Needs footykit FK-35 first (same card shape); until then this item is `Blocked:` on it. Header: "SLATE · 18-11 · NBA + Football". Live scores and updates as GT-5.
-Blocked: (2026-11-21) FK-35 shipped, but the "same card shape" it promised no longer holds, and the combined Slate needs answers and kit work first: (1) footykit's cards are now 561 × 96 (FK-50, FK-53, FK-73), calendarkit's 509 × 78: how do the two sit in one grid (football's size for every cell with NBA cards padded, each card its own size, or footykit back to 509 × 78)? (2) Neither kit offers one card on its own: footykit's part draws a whole day (SlateDay) and calendarkit's a whole night with its own header (SlateCopy), so cards can't be mixed in time order or given a sport mark until both export a single card (new footykit and calendarkit items). (3) Which games are "18-11" in a combined Slate: the NBA night is a US Eastern date, football's day is the local (São Paulo) day. (4) No footykit Slate kit is served at run time as calendarkit's is (/calendar/slatekit/): is a pinned footykit package enough (a new card design then needs a new pin here), or should footykit get a kit too? The owner answers and unblocks.
-**Tests:** e2e: each of the three widget kinds renders; combined is in time order with both sports.
+#### GT-14 — Football Slate widget
+**In short:** A new Slate widget on the whiteboard showing the day's football matches (footykit's Slate), next to the NBA one.
+**What:** next to the NBA Slate widget, a Football Slate widget: footykit's Slate for one day, loaded live from footykit's kit at `/football/slatekit/manifest.json`, the same way the NBA Slate widget loads calendarkit's kit (same fallback rule as the NBA widget has). Cards as footykit draws them (561 × 96). Header: "SLATE · 18-11 · Football". Live scores and updates as GT-5. A game counts for the day it starts on in São Paulo time, and a game that starts before 05:00 São Paulo time counts for the day before (owner's rule, 2026-11-21: a late NBA game belongs to the night it is part of; football in South America and Europe never starts that late).
+The Combined Slate (football plus NBA) is now GT-21.
+**Answered (2026-11-21):** Is a pinned footykit package enough, or should footykit get a kit served at run time like calendarkit's? → A kit served at run time, like calendarkit's (footykit FK-76).
+Blocked: waits for footykit FK-76 (footykit serves its Slate kit live).
+**Tests:** e2e: the Football Slate widget renders the day's matches; a 04:30 São Paulo start shows on the day before.
+
+#### GT-21 — Combined Slate widget (football plus NBA)
+**In short:** A new Slate widget on the whiteboard with football and NBA games together in start-time order, a small sport mark on each card.
+**What:** split from GT-14 (2026-11-21). One Slate with both sports' games sorted by start time, a small sport mark on each card. Can be placed on its own, like NBA only and Football only. Header: "SLATE · 18-11 · NBA + Football". Live scores and updates as GT-5. Cards come from the two kits' single-card exports (footykit FK-77, calendarkit CK-34).
+**Answered (2026-11-21):** footykit's cards are 561 × 96 and calendarkit's 509 × 78: how do the two sit in one grid? → Neither card changes size (the NBA card must stay 509 × 78). Every cell of the grid is 561 × 96; an NBA card sits centred in its cell with empty space around it.
+**Answered (2026-11-21):** Which games are "18-11" in a combined Slate? → A game counts for the day it starts on in São Paulo time, and a game that starts before 05:00 São Paulo time counts for the day before (owner's rule, 2026-11-21: a late NBA game belongs to the night it is part of; football in South America and Europe never starts that late). So "18-11" is every football match and every NBA game that starts from 05:00 on the 18th to just before 05:00 on the 19th, São Paulo time.
+Blocked: waits for footykit FK-77, calendarkit CK-34 and GT-14.
+**Tests:** e2e: the combined widget is in start-time order with both sports and a sport mark on every card; an NBA game starting 01:00 São Paulo time on the 19th shows under 18-11; NBA cards are 509 × 78 inside 561 × 96 cells.
 
 #### GT-16 — Countdown button in the Slate widgets
 **In short:** The Slate widgets on the whiteboard get the same "⏱ Countdown" button as calendarkit and footykit, opening halftime-timer counting down to the first game.
@@ -82,35 +58,54 @@ Blocked: (2026-11-21) FK-35 shipped, but the "same card shape" it promised no lo
 Blocked: waits for calendarkit CK-22 (and footykit FK-61 for the football and combined Slates); the owner unblocks it once they ship.
 **Tests:** e2e: the button is in the NBA Slate widget and its link points to halftime-timer with the right time.
 
-### Held (needs the owner's "go"; never built from "build the backlog")
-
-#### GT-6 — Phase 4: things connect (cards go anywhere)
+#### GT-6 — Cards go anywhere
 **In short:** Cards become real whiteboard objects you can grab and move anywhere, in or out of lists.
-Start only when the owner says "go" for GT-6; then move it to Ready. Plan it in steps first (stop after the plan),
-then build one step at a time, stopping to report after each.
+Build one step at a time (docs/GT-6-PLAN.md), stopping to report after each.
 Owner's decisions (2026-10-20, 2026-11-12):
 - Cards become real whiteboard objects: directly clickable, draggable, selectable by box and lasso, no double-click
   to enter a board first. No interim "two clicks" mode.
 - A board works like a frame: a named container, moved by its title AND by the gaps between its lists, or by
   selecting it. Dragging a board's corner still scales everything together.
 - A card dropped on the empty page leaves its list and lives only on the whiteboard until dropped into a list again.
+  If its board has a linked map, the card leaves the map too.
 - A copied card is a new, independent card.
 - While dragging a card, a line shows where it will land and the target list is highlighted.
 - Ctrl+Z on the whiteboard undoes a card move that also changed Boardkit data, in one step.
-- Arrows attach to a single card inside a board and a single box inside a map, and stay attached when things move.
-- Things attached to a card follow it when it moves; when a card is deleted, arrows and things attached to it go with it.
 - Every card change on the whiteboard saves to Boardkit too (same live board in /boardkit).
-Open question for the owner before step 1: the original plan said "notes stick to cards", but sticky notes were removed
-from the toolbar (2026-10-22). What gets attached to a card: text, rectangles, anything? Ask; do not pick a default.
+Scope cut 2026-11-21 (owner, chat): GT-6 is only the four steps in docs/GT-6-PLAN.md (pick and move cards, cards
+leave their list, copy and delete, speed and clean-up). Arrows on a card, things stuck to a card and arrows on a
+map box are now GT-18, GT-19, GT-20 under Held: decided after the owner has used GT-6 for real.
+**Answered (2026-11-21):** How do you edit a card's text without entering the board first? → Double-click the card.
+**Answered (2026-11-21):** A card dragged out of a board scaled to 50%: small or full size? → It stays small; dropped into another board, it takes that board's size.
+Owner said "go" 2026-11-21, steps OK'd. Step 1 (pick and move cards) and step 2 (cards leave their list) built 2026-11-21; steps 3-4 wait for the owner's word, one at a time.
 
-## halftime-timer
+#### GT-22 — Past-season games in the Slate widget's season-series popup are clickable
+**In short:** In the Slate widget on the whiteboard, the past-season games of the season-series popup open NBA.com in a new tab, as in calendarkit.
+**What:** the popup comes from calendarkit's kit (`kit.useSeriesPopup` in `src/slate/hover.tsx`), so the links arrive with calendarkit CK-35. After it ships: bump the pinned calendarkit package (the fallback) and make sure a click on a past-season square inside the widget opens the link in a new tab and doesn't select or drag the widget.
+Blocked: waits for calendarkit CK-35.
+**Tests:** e2e: in the NBA Slate widget, open the season-series popup, switch to an earlier season; each square is a link to `nba.com/games?date=` and clicking it leaves the widget unselected and in place.
 
-### Ready
+### Held (needs the owner's "go"; never built from "build the backlog")
 
-#### HT-3 — Shared layout: pinned header menu, chips instead of dropdowns
-**In short:** halftime-timer gets the shared layout every app now uses: a header always at the top (back/forward, breadcrumb, main places, "Go anywhere" search), and under it "What" chips and a "How" switch, so nothing is hidden in dropdowns.
-**What:**
-- Follow [NAV_PATTERN.md](https://github.com/AlexLCBranco/backlogkit/blob/main/NAV_PATTERN.md) exactly (read it first; it is the spec). Same look as footykit FK-65 so the apps read as one site; if FK-65 has shipped, copy its header styles rather than re-designing.
-- If the app has fewer than 2 places, the header still appears (back/forward, breadcrumb, search) with only the tabs it has; don't invent places.
-- Replace every `<select>` used to pick what's shown with chips/strips. Every state in the URL; old URLs keep working.
-**Tests:** as in NAV_PATTERN.md section 6.
+#### GT-18 — Arrows attach to one card
+**In short:** An arrow's end can snap to a single card and stays on it wherever the card goes.
+**What:** after GT-6. An arrow's end snaps to a single card (in a list or free on the page) and stays attached when
+the card, its list or its board moves, and when the card changes list. Deleting the card deletes its arrows.
+**Tests:** e2e: attach, then move card / list / board / to another list / out to the page; delete card.
+
+#### GT-19 — Things stick to a card
+**In short:** Text, shapes, pictures or drawings can be attached to a card and then follow it everywhere.
+**What:** after GT-6. Anything can be attached to a card (owner, 2026-11-21); it follows the card through list
+moves, board moves and scaling, and is deleted with it.
+**Open question (not asked yet: the owner decides after using GT-6 for real, 2026-11-21):** how does a thing get
+attached: by dropping it on top of the card (and dragging it off lets go), or some other way? If the owner says "go"
+before answering, don't build: put a `Blocked:` note with this question.
+**Tests:** e2e: attach each kind; follows through list moves, board moves, scaling; delete; detach; undo.
+
+#### GT-20 — Arrows attach to one box of a map
+**In short:** An arrow's end can snap to a single box inside a Linkkit map and stays on it.
+**What:** after GT-18. Same as GT-18, for a single box inside a map on the whiteboard. Needs a Linkkit release.
+**Open question (not asked yet: the owner decides after using GT-6 and GT-18 for real, 2026-11-21):** do only arrows
+attach to map boxes, or do boxes also become objects picked with one click, like cards? If the owner says "go" before
+answering, don't build: put a `Blocked:` note with this question.
+**Tests:** e2e: attach; edit the map so the box moves; move/scale the map; delete the box.
