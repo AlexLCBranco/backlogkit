@@ -75,6 +75,8 @@ backlogkit (the owner's site that shows every repo's lists) reads these lines; k
 - Blocked: a `Blocked:` line means the item waits on the owner. "build the backlog", "next batch" and "next" skip
   blocked items (they stay where they are) until the owner answers. An answer replaces the `Blocked:` line with
   `**Answered (YYYY-MM-DD):** <the question> → <the answer>`; from then on the item is built normally.
+  When an item waits for another item (in this repo or another), write that item's ID in the `Blocked:` line; backlogkit
+  then says when it has shipped.
 - Ideas: every idea in `IDEAS.md` ends with one reason tag saying why it isn't planned: `[why: waiting]` waits on
   something (a data source, a key or account, another feature, an outside event; the idea's text says which),
   `[why: decision]` needs the owner to decide something, `[why: too-big]` needs splitting first, `[why: later]` not

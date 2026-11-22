@@ -2,6 +2,36 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-21 — BL-21
+
+**Built**
+- BL-21 — Stuck items say when the thing they wait for has shipped (v1.18.0). Every item ID written in a
+  `Blocked:` line (its own ID left out) is looked up in every repo's lists. All shipped: the card turns green, says
+  "HT-1 has shipped (halftime-timer, <day>): this can be unblocked" and goes to the top of Stuck. Some shipped: one
+  line per ID saying which has shipped and which has not; the card stays where it was. Still planned: "Still waiting
+  for HT-1 (planned in halftime-timer)". Nowhere: "HT-9 was not found in any project". No ID: nothing changes. The
+  count ("1 can be unblocked") shows next to the Stuck number in three places: the number strip, the Stuck heading,
+  and each project's card. The site only shows this; it edits nothing.
+- Rule text added to this repo's CLAUDE.md ("backlogkit formats", Blocked bullet).
+
+**Decided without the spec saying** (say if you want any changed)
+- Several IDs, all shipped: one line per ID, then "All of them have shipped: this can be unblocked".
+- A named ID that is only an idea (I-n / U-n): "Still waiting for I-3 (an idea in footykit, not planned)". Idea
+  numbers repeat across repos, so I-n means the stuck item's own repo first.
+- "Still waiting" and "not found" lines are yellow; only "can be unblocked" is green.
+- Any capital-letters-dash-number counts as an ID, as the spec says, so "UTF-8" in a Blocked line would show
+  "UTF-8 was not found in any project".
+
+**Other repos that need the same sentence** in "backlogkit formats" → Blocked (not edited from here): footykit,
+gauntlet, calendarkit, boardkit, rotationkit, halftime-timer, statmuse-builder, linkkit.
+
+**Tests:** 197 unit + 33 e2e pass locally (suite 0.6 min). New: `tests/waits.test.ts` (IDs in a Blocked line, every
+case's text, order, counts), three page tests, one e2e with fixture repos (green card first in Stuck, counts).
+BL-22 had no `**Estimate:**` line: added "build ~10 min · suite ~1 min", a guess.
+
+**Blocked:** none. **Ideas added:** none.
+**Test by hand:** nothing needed.
+
 ## 2026-11-21 — BL-20
 
 **Built**

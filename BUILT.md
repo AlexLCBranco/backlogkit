@@ -5,6 +5,8 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.6 min (2026-11-21) · longest ~0.8 min (2026-11-21)
 
 ## 2026-11-21
+- BL-21 — Stuck items say when the thing they wait for has shipped (v1.18.0) (took 7 min, suite 0.6 min)
+  A stuck item whose `Blocked:` line names another item (like HT-1) now says "HT-1 has shipped (halftime-timer, <day>): this can be unblocked" in green and moves to the top of Stuck; the Stuck number says how many can be unblocked.
 - BL-20 — Searching a feature code explains it at the top (v1.17.0) (took 9 min, suite 0.6 min)
   Typing a code like "CK-17" (or "ck17", "demo I-2", "U-1") in search shows a box above the results with its title, project, state, its one-sentence summary and a link to where it is written on GitHub; an unknown code says "No feature has the code CK-999".
 ### Internal
