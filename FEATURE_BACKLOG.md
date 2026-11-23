@@ -8,8 +8,6 @@ results in one line). Everything automatable is tested automatically; no manual 
 
 ## Ready
 
-## Held (needs the owner's "go"; never built from "build the backlog")
-
 ### BL-24 — A clearer Stuck section
 **In short:** Stuck splits into "Ready to go again" and "Still waiting", each card shows a simple ✓/⏳ checklist instead of a red sentence followed by green ones, and one button sends a ready item back to the plan.
 
@@ -47,3 +45,6 @@ What changes:
 Tests: unit tests for the grouping, header text, checklist rows (shipped / planned / idea / missing / stuck-but-ready),
 the prefilled Unstick text; UI test that a card in Ready shows no red text and has Unstick; e2e for the screenshot case.
 **Estimate:** build ~20–30 min · suite ~1 min (guess)
+
+
+## Held (needs the owner's "go"; never built from "build the backlog")
