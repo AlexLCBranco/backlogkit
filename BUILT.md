@@ -10,6 +10,7 @@ Suite time: last ~0.7 min (2026-11-24) · longest ~0.8 min (2026-11-21)
 - BL-24 — A clearer Stuck section (v1.21.0) (took 7 min, suite 0.7 min)
   Stuck now has three groups, "Ready to go again", "Still waiting" and "Needs your answer"; each card shows a green ✓ / amber ⏳ "Waits for:" list, and "Unstick" opens the answer box already filled in.
 ### Internal
+- CI: after a push the live site gets only the 3 @smoke tests (was every live e2e), and the wait for the new version checks every 30 s (was 10 s); new "Vercel requests are a budget" rule in CLAUDE.md
 - docs: new "Blocked" rule in CLAUDE.md: a Blocked line that only waits for other items unblocks itself at the next build; a question needs a "?" and still waits for the owner
 
 ## 2026-11-21

@@ -695,7 +695,7 @@ test.describe('mocked GitHub', () => {
   });
 });
 
-test('version in the bottom-right corner, and /version.json', async ({ page, request }) => {
+test('version in the bottom-right corner, and /version.json', { tag: '@smoke' }, async ({ page, request }) => {
   await page.route('**/api/projects', async (r) => (live ? r.continue() : r.fulfill({ json: await fixtureData() })));
   await page.goto('/');
   const v = page.getByTestId('site-version');
@@ -727,7 +727,7 @@ test('logo: header and favicon load (BL-5)', async ({ page, request }) => {
   expect(await res.text()).toContain('<svg');
 });
 
-test('live: real projects load from GitHub', async ({ page }) => {
+test('live: real projects load from GitHub', { tag: '@smoke' }, async ({ page }) => {
   test.skip(!live, 'live only');
   await page.goto('/');
   await expect(page.getByTestId('lane-next')).toBeVisible({ timeout: 20_000 });
@@ -740,7 +740,7 @@ test('live: real projects load from GitHub', async ({ page }) => {
   await page.getByRole('group', { name: 'Filter by project' }).getByRole('button', { name: 'All projects' }).click(); // leave no filter behind
 });
 
-test('live: moves are protected: no password, or a wrong one, writes nothing (BL-11)', async ({ request }) => {
+test('live: moves are protected: no password, or a wrong one, writes nothing (BL-11)', { tag: '@smoke' }, async ({ request }) => {
   test.skip(!live, 'live only');
   const body = { action: 'ready', repo: 'backlogkit', id: 'BL-1' };
   const none = await request.post('/api/move', { data: body });

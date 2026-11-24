@@ -6,6 +6,18 @@ planned items, built items and ideas. Project info is hand-edited in `projects.j
 Testing: everything automatable is automated (no manual checklists, no browser windows left open). Never invent data:
 a field nobody filled in shows as a dash.
 
+## Vercel requests are a budget (owner's rule, 2026-11-24)
+
+Vercel's free plan gives 1M CDN requests per rolling 30 days, shared by every one of the owner's projects; going over
+pauses them all. Every page, file, API call and prefetch on a `*.vercel.app` site counts; local runs cost nothing.
+- The full Playwright suite runs **locally** (against a local production build), never against the live site unless
+  the owner asks for it.
+- After a push the live site gets only a **small smoke check**: the tests tagged `@smoke` (load the site, the version,
+  the move guard). `playwright.config.ts` runs only those when `LIVE_URL` is set; `LIVE_FULL=1` lifts that, only on
+  the owner's request.
+- Check the live `/version.json` at most every 30 s (`scripts/wait-live.ts`), and stop once it shows the new version.
+  Don't open live pages in a browser to look around when a local run shows the same thing.
+
 ## Feature backlog, built list and ideas (owner's standing workflow, updated 2026-11-15)
 
 Three lists, never mixed:

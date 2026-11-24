@@ -1,6 +1,6 @@
 # Tests on every push and pull request: the lists and version check, unit tests, typecheck + build, and the e2e
-# against the built site (GitHub mocked). After a push to main, the same e2e's live parts run against the deployed site
-# once Vercel shows this commit's version.
+# against the built site (GitHub mocked). After a push to main, only the small @smoke check runs against the deployed
+# site once Vercel shows this commit's version (Vercel requests are a budget, CLAUDE.md).
 name: CI
 
 on:
@@ -45,6 +45,7 @@ jobs:
         run: npx tsx scripts/wait-live.ts
         env:
           LIVE_URL: ${{ vars.LIVE_URL }}
-      - run: npx playwright test
+      - name: Smoke check on the live site (@smoke only)
+        run: npx playwright test --grep @smoke
         env:
           LIVE_URL: ${{ vars.LIVE_URL }}
