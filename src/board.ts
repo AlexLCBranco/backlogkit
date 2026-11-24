@@ -141,7 +141,7 @@ export function boardItems(data: Data, sort: SortKey, cutoff: string | null): Bo
     let n = 0;
     for (const s of plannedSections(p)) for (const i of s.items) plan.push(planned(p.repo, s.kind, i, n++, index));
   }
-  const out = unblockFirst(plan); // BL-21: stuck items that can be unblocked come first in Stuck
+  const out = unblockFirst(plan); // BL-21, BL-24: stuck items ready to go again come first in Stuck
   // Done: newest day first; within a day, projects in card order, each file's order kept.
   const days = new Set<string>();
   for (const p of projects) for (const d of p.built) if (!cutoff || d.date >= cutoff) days.add(d.date);
@@ -164,11 +164,10 @@ export function laneCounts(items: BoardItem[], ideas: BoardIdea[]): Record<Lane,
   return c;
 }
 
-/** How many stuck items can be unblocked (BL-21): shown wherever the Stuck number is. */
+/** How many stuck items are ready to go again (BL-21, BL-24): every item they wait for has shipped. */
 export const unblockCount = (items: BoardItem[]) => items.filter((i) => i.lane === 'stuck' && i.waits?.ready).length;
-export const unblockText = (n: number) => `${n} can be unblocked`;
 
-/** One project's stuck items that can be unblocked (its card on the Projects page). */
+/** One project's stuck items that are ready to go again (its card on the Projects page). */
 export function projectUnblockCount(p: Project, index: CodeIndex): number {
   let n = 0;
   for (const s of plannedSections(p)) for (const i of s.items) if (i.blocked && waitsFor(i.blockedNote?.text, i.id, p.repo, index)?.ready) n++;

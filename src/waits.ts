@@ -1,6 +1,7 @@
 // Stuck items that wait for another item (BL-21). A `Blocked:` line can name the item it waits for ("waits for HT-1").
 // The site looks every named ID up in every repo's lists and says, in plain words, whether it has shipped. When every
-// named ID has shipped the stuck item "can be unblocked". The site only shows this: it never edits a repo.
+// named ID has shipped the stuck item is "ready to go again" (BL-24: Stuck shows it in its own group, with a ✓/⏳ checklist
+// and an Unstick button that fills in the owner's answer box). The site only edits a repo when the owner saves.
 import type { Data } from './types';
 
 const ID_IN_TEXT = /\b[A-Z]{1,4}-\d+[a-z]?\b/g;
@@ -16,6 +17,10 @@ export interface CodePlaces {
   built: { repo: string; date: string }[];
   planned: string[];
   ideas: (string | null)[];
+  /** BL-24: what the item is, per repo (its "In short" sentence, else its title); repo null = unassigned idea. */
+  about: { repo: string | null; text: string }[];
+  /** BL-24: the Blocked note of a planned item that is itself stuck, per repo. */
+  stuck: { repo: string; note: string }[];
 }
 export type CodeIndex = Map<string, CodePlaces>;
 
@@ -24,15 +29,33 @@ export function codeIndex(data: Data): CodeIndex {
   const index: CodeIndex = new Map();
   const at = (id: string | null) => {
     if (!id) return null;
-    if (!index.has(id)) index.set(id, { built: [], planned: [], ideas: [] });
+    if (!index.has(id)) index.set(id, { built: [], planned: [], ideas: [], about: [], stuck: [] });
     return index.get(id)!;
   };
   for (const p of data.projects) {
-    for (const s of p.planned) if (s.kind !== 'other') for (const i of s.items) at(i.id)?.planned.push(p.repo);
-    for (const d of p.built) for (const i of d.items) at(i.id)?.built.push({ repo: p.repo, date: d.date });
-    for (const i of p.ideas) at(i.id)?.ideas.push(p.repo);
+    for (const s of p.planned)
+      if (s.kind !== 'other')
+        for (const i of s.items) {
+          const c = at(i.id);
+          if (!c) continue;
+          c.planned.push(p.repo);
+          c.about.push({ repo: p.repo, text: i.short ?? i.title });
+          if (i.blocked) c.stuck.push({ repo: p.repo, note: i.blockedNote?.text ?? '' });
+        }
+    for (const d of p.built)
+      for (const i of d.items) {
+        at(i.id)?.built.push({ repo: p.repo, date: d.date });
+        at(i.id)?.about.push({ repo: p.repo, text: i.title.replace(/\s*\(v\d[^)]*\).*$/, '') }); // "Title (v1.0.0) (took …)" → "Title"
+      }
+    for (const i of p.ideas) {
+      at(i.id)?.ideas.push(p.repo);
+      at(i.id)?.about.push({ repo: p.repo, text: i.text });
+    }
   }
-  for (const i of data.unassigned.ideas) at(i.id)?.ideas.push(null);
+  for (const i of data.unassigned.ideas) {
+    at(i.id)?.ideas.push(null);
+    at(i.id)?.about.push({ repo: null, text: i.text });
+  }
   return index;
 }
 
@@ -44,6 +67,10 @@ export interface WaitRef {
   repo: string | null;
   /** The day it is listed under in BUILT.md (shipped only). */
   date: string | null;
+  /** BL-24: what it is, in plain words (its "In short" sentence or title); null when not found. */
+  about?: string | null;
+  /** BL-24: a planned item that is itself stuck, and everything it waits for has shipped: unstick it first. */
+  stuckReady?: boolean;
 }
 export interface Waits {
   refs: WaitRef[];
@@ -56,15 +83,31 @@ export interface Waits {
 /** Ideas are numbered per repo (I-1 is in many), so an ID found in several repos means the stuck item's own repo first. */
 const pick = <T>(list: T[], repoOf: (x: T) => string | null, own: string): T => list.find((x) => repoOf(x) === own) ?? list[0]!;
 
+const aboutOf = (places: CodePlaces, repo: string | null) => places.about.find((a) => a.repo === repo)?.text ?? null;
+
+/** BL-24: a stuck planned item whose own Blocked note names IDs that have all shipped (one level down only). */
+function stuckButReady(id: string, repo: string, index: CodeIndex): boolean {
+  const note = index.get(id)?.stuck.find((s) => s.repo === repo)?.note;
+  if (note === undefined) return false;
+  const ids = blockedIds(note, id);
+  return ids.length > 0 && ids.every((x) => (index.get(x)?.built.length ?? 0) > 0);
+}
+
 export function waitRef(id: string, ownRepo: string, index: CodeIndex): WaitRef {
   const places = index.get(id);
   if (places?.built.length) {
     const b = pick(places.built, (x) => x.repo, ownRepo);
-    return { id, state: 'shipped', repo: b.repo, date: b.date };
+    return { id, state: 'shipped', repo: b.repo, date: b.date, about: aboutOf(places, b.repo) };
   }
-  if (places?.planned.length) return { id, state: 'planned', repo: pick(places.planned, (x) => x, ownRepo), date: null };
-  if (places?.ideas.length) return { id, state: 'idea', repo: pick(places.ideas, (x) => x, ownRepo), date: null };
-  return { id, state: 'missing', repo: null, date: null };
+  if (places?.planned.length) {
+    const repo = pick(places.planned, (x) => x, ownRepo);
+    return { id, state: 'planned', repo, date: null, about: aboutOf(places, repo), stuckReady: stuckButReady(id, repo, index) };
+  }
+  if (places?.ideas.length) {
+    const repo = pick(places.ideas, (x) => x, ownRepo);
+    return { id, state: 'idea', repo, date: null, about: aboutOf(places, repo) };
+  }
+  return { id, state: 'missing', repo: null, date: null, about: null };
 }
 
 const refText = (r: WaitRef): string =>
@@ -95,3 +138,56 @@ export function waitsFor(note: string | null | undefined, ownId: string | null, 
 export function unblockFirst<T extends { waits: Waits | null }>(items: T[]): T[] {
   return [...items.filter((i) => i.waits?.ready), ...items.filter((i) => !i.waits?.ready)];
 }
+
+// BL-24: Stuck in three groups, a checklist per card, and the Unstick text.
+export type StuckGroup = 'ready' | 'waiting' | 'answer';
+export const STUCK_GROUPS: { key: StuckGroup; label: string; help: string }[] = [
+  { key: 'ready', label: 'Ready to go again', help: 'Everything these waited for is done. Press Unstick to put them back in the plan.' },
+  { key: 'waiting', label: 'Still waiting', help: "These wait for something that isn't built yet." },
+  { key: 'answer', label: 'Needs your answer', help: 'These need you to decide something. Press Answer.' },
+];
+/** Which group a stuck item is in: all it names has shipped → ready; names something else → waiting; names nothing → answer. */
+export const stuckGroup = (w: Waits | null): StuckGroup => (!w ? 'answer' : w.ready ? 'ready' : 'waiting');
+
+/** Ready to go again first, then Still waiting, then Needs your answer; each group keeps the order it had. */
+export function stuckGroups<T extends { waits: Waits | null }>(items: T[]) {
+  return STUCK_GROUPS.map((g) => ({ ...g, items: items.filter((i) => stuckGroup(i.waits) === g.key) }));
+}
+
+/** The words after the Stuck number: "3 ready to go again · 1 still waiting" (parts that are 0 left out); '' when none. */
+export function stuckSummary(items: { waits: Waits | null }[]): string {
+  const ready = items.filter((i) => stuckGroup(i.waits) === 'ready').length;
+  const waiting = items.filter((i) => stuckGroup(i.waits) === 'waiting').length;
+  return [ready && `${ready} ready to go again`, waiting && `${waiting} still waiting`].filter(Boolean).join(' · ');
+}
+export const readyText = (n: number) => `${n} ready to go again`;
+
+/** One "Waits for:" row: the mark, the line, its colour, and what the waited item is (small grey text). */
+export interface CheckRow {
+  id: string;
+  mark: '✓' | '⏳' | '✕';
+  tone: 'ok' | 'wait' | 'bad';
+  text: string;
+  about: string | null;
+  /** A planned item that is itself stuck but ready: the repo of the card to scroll to. */
+  unstickFirst: string | null;
+}
+export function checkRow(r: WaitRef): CheckRow {
+  const base = { id: r.id, about: r.about ?? null, unstickFirst: null };
+  if (r.state === 'shipped') return { ...base, mark: '✓', tone: 'ok', text: `${r.id} — ${r.repo} — built ${r.date}` };
+  if (r.state === 'planned')
+    return r.stuckReady
+      ? { ...base, mark: '⏳', tone: 'wait', text: `${r.id} — ${r.repo} — is stuck but ready: unstick it first`, unstickFirst: r.repo }
+      : { ...base, mark: '⏳', tone: 'wait', text: `${r.id} — ${r.repo} — planned, not built yet` };
+  if (r.state === 'idea')
+    return { ...base, mark: '⏳', tone: 'wait', text: `${r.id} — ${r.repo ? `an idea in ${r.repo}` : 'an idea with no project yet'}, not planned yet` };
+  return { ...base, mark: '✕', tone: 'bad', text: `${r.id} — not found in any project` };
+}
+
+/** What the answer box holds when Unstick opens it. */
+export function unstickText(w: Waits): string {
+  return `Everything it waited for is built: ${w.refs.map((r) => `${r.id} (${r.repo}, ${r.date})`).join(', ')}.`;
+}
+
+/** The id of a stuck card on the page, so an "unstick it first" row can scroll to it. */
+export const stuckCardId = (repo: string, id: string) => `stuck-${repo}-${id}`;

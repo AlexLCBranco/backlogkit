@@ -2,6 +2,30 @@
 
 Claude Code's end-of-run reports, newest first (rules: CLAUDE.md, "Feature backlog, built list and ideas").
 
+## 2026-11-24 — BL-24
+
+**Built**
+- BL-24 — A clearer Stuck section (v1.21.0). Stuck is split into "Ready to go again (n)", "Still waiting (n)" and
+  "Needs your answer (n)", each with its plain line; empty groups are hidden. The lane heading and the number strip say
+  "4: 3 ready to go again · 1 still waiting" (zero parts left out); project cards say "(n ready to go again)". Each card
+  with IDs in its Blocked line shows "Waits for:" with one row per ID: ✓ green "FK-76 — footykit — built 2026-11-21",
+  ⏳ amber "planned, not built yet" / "an idea in <repo>, not planned yet", ✕ red only for "not found in any project",
+  and "is stuck but ready: unstick it first" with a "Go to GT-14" link that scrolls to that card. Under each row, the
+  waited item's "In short" sentence (or title) in small grey text. The old red sentence moved into the opened card as
+  "Original note: ...". Cards in "Ready to go again" have "Unstick" (locked: "Unlock as owner to unstick"), which opens
+  the answer box filled with "Everything it waited for is built: FK-76 (footykit, 2026-11-21)."; Save works like Answer.
+- Choices made where the spec was silent: the heading keeps its name "Stuck – needs you" (only the words after the
+  number changed); a pure question card ("Needs your answer") keeps its question visible, since it has no checklist;
+  the Build order page still says "can be unblocked" (the spec only named the Projects page).
+
+**Tests:** 227 unit + 35 e2e pass (3 live-only skipped), build OK. New: grouping, header words, every checklist row,
+the Unstick text, Unstick UI, no red in Ready, and the owner's screenshot case (GT-14/16/22 ready, GT-21 points to GT-14)
+end to end, including Unstick → Save → GT-14 in "Will be built next".
+
+**Blocked:** none. **Ideas added:** none.
+
+**Test by hand:** nothing; it is all covered by tests.
+
 ## 2026-11-21 — BL-23
 
 **Built**

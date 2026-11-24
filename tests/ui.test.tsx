@@ -10,7 +10,7 @@ import { hrefOf, parseHash, titleOf, type Nav } from '../src/nav';
 import { SEEN_STORAGE_KEY, doneKey, loadSeen, markSeen, newCutoff, newDone, saveSeen, LANES, boardIdeas, boardItems, builtCutoff, builtGroups, ideaMatches, laneCounts, laneOf, matches } from '../src/board';
 import type { Data } from '../src/types';
 import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from './fixtures';
-import { waitData } from './wait-fixtures';
+import { SCREENSHOT_FILES, waitData } from './wait-fixtures';
 
 let data: Data;
 beforeAll(async () => {
@@ -548,38 +548,126 @@ describe('searching a code explains it at the top (BL-20)', () => {
   });
 });
 
-describe('stuck items say when the thing they wait for has shipped (BL-21)', () => {
+describe('a clearer Stuck section (BL-24, was BL-21)', () => {
   let wd: Data;
+  let shot: Data;
   beforeAll(async () => {
     wd = await waitData();
+    shot = await waitData(SCREENSHOT_FILES);
   });
-  const showWait = (hash: string) => render(<Harness d={wd} hash={hash} now={NOW} />);
-  it('"can be unblocked" cards come first in Stuck, in their own colour class, with the plain sentence', () => {
+  const ownerOf = (unlocked = true) => {
+    const moves: MoveRequest[] = [];
+    const o: Owner = { canMove: true, unlocked, move: async (r) => (moves.push(r), null), unlock: async () => null, lock: () => {} };
+    return { o, moves };
+  };
+  const showWait = (hash: string, d: Data = wd, o?: Owner) =>
+    render(
+      o ? (
+        <OwnerContext.Provider value={o}>
+          <Harness d={d} hash={hash} now={NOW} />
+        </OwnerContext.Provider>
+      ) : (
+        <Harness d={d} hash={hash} now={NOW} />
+      ),
+    );
+  const ids = (el: HTMLElement) => within(el).getAllByTestId('stuck-card').map((c) => c.querySelector('.id')!.textContent);
+  const checks = (card: HTMLElement) => within(card).queryAllByTestId('check-row').map((r) => r.querySelector('.check-text')!.textContent);
+
+  it('three groups in order, each with its heading, count and plain line; each keeps its order', () => {
     showWait('#/');
-    const cards = within(lane('stuck')).getAllByTestId('stuck-card');
-    expect(cards.map((c) => c.querySelector('.id')!.textContent)).toEqual(['FK-61', 'FK-62', 'AL-1', 'AL-2', 'AL-3', 'HT-4']);
-    expect(cards.map((c) => c.classList.contains('can-unblock'))).toEqual([true, true, false, false, false, false]);
-    const waits = (n: number) => [...(cards[n]!.querySelector('[data-testid="waits"]')?.querySelectorAll('.waits-line') ?? [])].map((l) => l.textContent);
-    expect(waits(0)).toEqual(['HT-1 has shipped (halftime, 2026-11-20): this can be unblocked']);
-    expect(waits(2)).toEqual([]); // no ID in its Blocked line: nothing changes
-    expect(waits(3)).toEqual(['HT-1 has shipped (halftime, 2026-11-20)', 'Still waiting for HT-2 (planned in halftime)']);
-    expect(waits(4)).toEqual(['HT-9 was not found in any project']);
-    expect(within(cards[0]!).getByTestId('blocked-note').textContent).toContain('the owner unblocks it once HT-1 ships'); // the question stays
+    const groups = within(lane('stuck')).getAllByTestId(/^stuck-group-/);
+    expect(groups.map((g) => g.querySelector('h3')!.textContent)).toEqual(['Ready to go again (2)', 'Still waiting (3)', 'Needs your answer (1)']);
+    expect(groups.map((g) => g.querySelector('.stuck-help')!.textContent)).toEqual([
+      'Everything these waited for is done. Press Unstick to put them back in the plan.',
+      "These wait for something that isn't built yet.",
+      'These need you to decide something. Press Answer.',
+    ]);
+    expect(groups.map(ids)).toEqual([['FK-61', 'FK-62'], ['AL-2', 'AL-3', 'HT-4'], ['AL-1']]);
   });
-  it('the count shows wherever the Stuck number shows: the strip, the lane heading and the project card', () => {
+  it('an empty group is hidden', () => {
+    show('#/'); // both stuck items here are questions
+    expect(within(lane('stuck')).getAllByTestId(/^stuck-group-/).map((g) => g.dataset.testid)).toEqual(['stuck-group-answer']);
+  });
+  it('each card shows a "Waits for:" checklist instead of the red sentence: shipped, planned, idea, not found', () => {
     showWait('#/');
-    expect(screen.getByTestId('strip-unblock').textContent).toBe('2 can be unblocked');
-    expect(lane('stuck').querySelector('h2')!.textContent).toBe('Stuck – needs you 6 · 2 can be unblocked');
+    const [fk61, fk62, al2, al3, ht4, al1] = within(lane('stuck')).getAllByTestId('stuck-card') as [HTMLElement, HTMLElement, HTMLElement, HTMLElement, HTMLElement, HTMLElement];
+    expect(within(fk61).getByTestId('checklist').querySelector('.checklist-title')!.textContent).toBe('Waits for:');
+    expect(checks(fk61)).toEqual(['HT-1 — halftime — built 2026-11-20']);
+    expect(checks(fk62)).toEqual(['HT-1 — halftime — built 2026-11-20', 'HT-3 — halftime — built 2026-11-18']);
+    expect(checks(al2)).toEqual(['HT-1 — halftime — built 2026-11-20', 'HT-2 — halftime — planned, not built yet']);
+    expect(checks(al3)).toEqual(['HT-9 — not found in any project']);
+    expect(checks(ht4)).toEqual(['I-1 — an idea in halftime, not planned yet']);
+    expect(within(al2).getAllByTestId('check-row').map((r) => r.querySelector('.check-mark')!.textContent)).toEqual(['✓', '⏳']);
+    expect(within(al2).getAllByTestId('check-row').map((r) => r.className)).toEqual(['check check-ok', 'check check-wait']);
+    expect(within(al3).getByTestId('check-row').className).toBe('check check-bad');
+    // What the waited item is, in small grey text.
+    expect(within(fk61).getByTestId('check-row').querySelector('.check-about')!.textContent).toBe('Half time timer');
+    expect(within(ht4).getByTestId('check-row').querySelector('.check-about')!.textContent).toBe('A timer idea');
+    // The red Blocked sentence is gone from cards with a checklist; its text moves into the expanded view.
+    for (const c of [fk61, fk62, al2, al3, ht4]) expect(within(c).queryByTestId('blocked-note')).toBeNull();
+    expect(within(fk61).getByTestId('original-note').textContent).toBe('Original note: FK-61 waits: the owner unblocks it once HT-1 ships.');
+    // A pure question keeps its question and has no checklist.
+    expect(within(al1).getByTestId('blocked-note').textContent).toBe('the owner picks a colour.');
+    expect(within(al1).queryByTestId('checklist')).toBeNull();
+  });
+  it('a card in Ready to go again shows no red text and has Unstick', () => {
+    showWait('#/', wd, ownerOf().o);
+    const card = within(screen.getByTestId('stuck-group-ready')).getAllByTestId('stuck-card')[0]!;
+    expect(card.querySelector('.check-bad, .blocked-note, .error')).toBeNull();
+    expect(within(card).getByTestId('unstick').textContent).toBe('Unstick');
+    expect(within(card).queryByTestId('answer')).toBeNull();
+    // Other groups keep Answer.
+    expect(within(screen.getByTestId('stuck-group-waiting')).getAllByTestId('answer')).toHaveLength(3);
+    expect(within(screen.getByTestId('stuck-group-answer')).getAllByTestId('answer')).toHaveLength(1);
+  });
+  it('locked: "Unlock as owner to unstick"', () => {
+    showWait('#/', wd, ownerOf(false).o);
+    expect(within(screen.getByTestId('stuck-group-ready')).getAllByTestId('answer-locked').map((n) => n.textContent)).toEqual(['Unlock as owner to unstick', 'Unlock as owner to unstick']);
+    expect(within(screen.getByTestId('stuck-group-answer')).getByTestId('answer-locked').textContent).toBe('Unlock as owner to answer');
+  });
+  it('Unstick opens the answer box already filled in; it can be edited; Save sends it as the answer', async () => {
+    const { o, moves } = ownerOf();
+    showWait('#/', wd, o);
+    const card = within(screen.getByTestId('stuck-group-ready')).getAllByTestId('stuck-card')[1]!;
+    fireEvent.click(within(card).getByTestId('unstick'));
+    const box = within(card).getByLabelText('Answer for FK-62') as HTMLTextAreaElement;
+    expect(box.value).toBe('Everything it waited for is built: HT-1 (halftime, 2026-11-20), HT-3 (halftime, 2026-11-18).');
+    fireEvent.change(box, { target: { value: box.value + ' Go.' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(moves).toEqual([{ action: 'answer', repo: 'footy', id: 'FK-62', answer: 'Everything it waited for is built: HT-1 (halftime, 2026-11-20), HT-3 (halftime, 2026-11-18). Go.' }]),
+    );
+  });
+  it('the counts: strip and heading say "2 ready to go again · 3 still waiting"; project cards say "ready to go again"', () => {
+    showWait('#/');
+    expect(screen.getByTestId('strip-unblock').textContent).toBe('2 ready to go again · 3 still waiting');
+    expect(lane('stuck').querySelector('h2')!.textContent).toBe('Stuck – needs you 6: 2 ready to go again · 3 still waiting');
     cleanup();
     showWait('#/projects');
-    expect(within(screen.getByTestId('card-footy')).getByTestId('counts').textContent).toBe('Stuck 2 (2 can be unblocked) · Will be built next 1 · Waiting for your OK 0 · Ideas 1');
+    expect(within(screen.getByTestId('card-footy')).getByTestId('counts').textContent).toBe('Stuck 2 (2 ready to go again) · Will be built next 1 · Waiting for your OK 0 · Ideas 1');
     expect(within(screen.getByTestId('card-alpha')).getByTestId('counts').textContent).toBe('Stuck 3 · Will be built next 0 · Waiting for your OK 0 · Ideas 0');
   });
-  it('nothing can be unblocked: no count anywhere', () => {
+  it('only questions stuck: no count words anywhere', () => {
     show('#/');
     expect(screen.queryByTestId('strip-unblock')).toBeNull();
     expect(screen.queryByTestId('lane-unblock')).toBeNull();
-    expect(screen.queryAllByTestId('waits')).toEqual([]);
+    expect(screen.queryAllByTestId('checklist')).toEqual([]);
+  });
+  it("the owner's screenshot: 3 ready, GT-21 still waiting, and its row says to unstick GT-14 first, with a link to it", () => {
+    showWait('#/', shot);
+    expect(lane('stuck').querySelector('h2')!.textContent).toBe('Stuck – needs you 4: 3 ready to go again · 1 still waiting');
+    expect(ids(screen.getByTestId('stuck-group-ready'))).toEqual(['GT-14', 'GT-16', 'GT-22']);
+    const gt21 = within(screen.getByTestId('stuck-group-waiting')).getByTestId('stuck-card');
+    expect(checks(gt21)).toEqual(['GT-14 — gauntlet — is stuck but ready: unstick it first']);
+    expect(within(gt21).getByTestId('check-row').querySelector('.check-about')!.textContent).toBe('The score shows on top of the run.');
+    const target = document.getElementById('stuck-gauntlet-GT-14')!;
+    let scrolled = false;
+    target.scrollIntoView = () => void (scrolled = true);
+    fireEvent.click(within(gt21).getByTestId('go-unstick'));
+    expect(scrolled).toBe(true);
+    const gt14 = within(screen.getByTestId('stuck-group-ready')).getAllByTestId('stuck-card')[0]!;
+    expect(checks(gt14)).toEqual(['FK-76 — footykit — built 2026-11-21']);
+    expect(within(gt14).getByTestId('check-row').querySelector('.check-about')!.textContent).toBe('Live score feed');
   });
 });
 

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fixtureData } from './fixture-data';
 import { BACKLOG, BUILT, IDEAS, mockGithub, projectsJson } from '../tests/fixtures';
 import { loadAll } from '../lib/github.mjs';
+import { SCREENSHOT_FILES } from '../tests/wait-fixtures';
 import { answerBlocked, heldToReady, ideaToHeld, setWhy } from '../lib/moves.mjs';
 import { counts, parseBacklog, parseIdeas } from '../lib/lists.mjs';
 
@@ -508,34 +509,69 @@ test.describe('mocked GitHub', () => {
     await expect(page.getByTestId('move')).toHaveCount(0);
   });
 
-  test('a stuck item naming a built ID says "can be unblocked", in green, first in Stuck (BL-21)', async ({ page }) => {
-    const repos = ['alpha', 'footy', 'halftime'];
-    const { fetchImpl } = mockGithub({
-      repos: repos.map((name) => ({ name })),
-      files: {
-        alpha: { 'FEATURE_BACKLOG.md': '## Ready\n\n### AL-1 — Alpha waits for a person\nBlocked: the owner picks a colour.\n\n### AL-2 — Alpha waits for a planned thing\nBlocked: after HT-2 and HT-9.\n' },
-        footy: { 'FEATURE_BACKLOG.md': '## Held\n\n### FK-61 — Whistle at half time\nBlocked: the owner unblocks it once HT-1 ships.\n' },
-        halftime: { 'FEATURE_BACKLOG.md': '## Ready\n\n### HT-2 — Second half\nText.\n', 'BUILT.md': '## 2026-11-18\n- HT-1 — Half time timer (v1.0.0)\n' },
-      },
-      projectsJson: projectsJson(repos.map((repo) => ({ repo, description: null, url: null, status: 'active', devices: null }))),
+  test("the owner's screenshot: Stuck in groups, a ✓/⏳ checklist with no red, Unstick fills the answer and the item goes to Will be built next (BL-24)", async ({ page }) => {
+    const repos = Object.keys(SCREENSHOT_FILES);
+    let backlog = SCREENSHOT_FILES.gauntlet['FEATURE_BACKLOG.md'];
+    const sent: unknown[] = [];
+    const load = async () => {
+      const { fetchImpl } = mockGithub({
+        repos: repos.map((name) => ({ name })),
+        files: { ...SCREENSHOT_FILES, gauntlet: { 'FEATURE_BACKLOG.md': backlog } },
+        projectsJson: projectsJson(repos.map((repo) => ({ repo, description: null, url: null, status: 'active', devices: null }))),
+      });
+      return { ...(await loadAll({ token: 'e2e-secret-token-value', fetchImpl })), canMove: true };
+    };
+    await page.route('**/api/projects', async (r) => r.fulfill({ json: await load() }));
+    await page.route('**/api/move', async (r) => {
+      const body = r.request().postDataJSON();
+      if (body.action === 'check') return r.fulfill({ json: { ok: true } });
+      sent.push(body);
+      backlog = answerBlocked({ backlog, id: body.id, answer: body.answer, date: '2026-11-24' }).backlog;
+      const g = (await load()).projects.find((p: { repo: string }) => p.repo === 'gauntlet')!;
+      return r.fulfill({ json: { ok: true, message: 'ok', updates: [g] } });
     });
-    const data = await loadAll({ token: 'e2e-secret-token-value', fetchImpl });
-    await page.route('**/api/projects', (r) => r.fulfill({ json: data }));
     await page.goto('/');
     const stuck = page.getByTestId('lane-stuck');
-    await expect(stuck.getByTestId('stuck-card').locator('.id')).toHaveText(['FK-61', 'AL-1', 'AL-2']); // footy is after alpha by name, yet first
-    const first = stuck.getByTestId('stuck-card').first();
-    await expect(first.getByTestId('waits')).toHaveText('HT-1 has shipped (halftime, 2026-11-18): this can be unblocked');
-    await expect(first.getByTestId('waits')).toHaveCSS('color', 'rgb(76, 195, 138)'); // green, not the stuck red
-    await expect(first).toHaveCSS('background-color', 'rgb(20, 41, 31)');
-    await expect(stuck.getByTestId('stuck-card').nth(1)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await expect(stuck.getByTestId('stuck-card').nth(1).getByTestId('waits')).toHaveCount(0);
-    await expect(stuck.getByTestId('stuck-card').nth(2).locator('.waits-line')).toHaveText(['Still waiting for HT-2 (planned in halftime)', 'HT-9 was not found in any project']);
-    await expect(page.getByTestId('strip-unblock')).toHaveText('1 can be unblocked');
-    await expect(stuck.locator('h2')).toHaveText('Stuck – needs you 3 · 1 can be unblocked');
+    await expect(stuck.locator('h2')).toHaveText('Stuck – needs you 4: 3 ready to go again · 1 still waiting');
+    await expect(page.getByTestId('strip-unblock')).toHaveText('3 ready to go again · 1 still waiting');
+    await expect(stuck.locator('h3')).toHaveText(['Ready to go again (3)', 'Still waiting (1)']);
+    const ready = page.getByTestId('stuck-group-ready');
+    await expect(ready.getByTestId('stuck-card').locator('.id')).toHaveText(['GT-14', 'GT-16', 'GT-22']);
+    const gt14 = ready.getByTestId('stuck-card').first();
+    await expect(gt14.getByTestId('check-row').locator('.check-text')).toHaveText('FK-76 — footykit — built 2026-11-21');
+    await expect(gt14.getByTestId('check-row')).toHaveCSS('color', 'rgb(76, 195, 138)'); // green
+    await expect(gt14.locator('.check-about')).toHaveText('Live score feed');
+    await expect(gt14.locator('.check-about')).toHaveCSS('color', 'rgb(139, 147, 163)'); // small grey
+    await expect(ready.locator('.blocked-note, .check-bad')).toHaveCount(0); // no red for things that are fine
+    await expect(gt14).toHaveCSS('background-color', 'rgb(20, 41, 31)');
+    // GT-21 waits for GT-14, which is stuck but ready: the row says so in amber, and the link scrolls to GT-14.
+    const gt21 = page.getByTestId('stuck-group-waiting').getByTestId('stuck-card');
+    await expect(gt21.locator('.check-text')).toHaveText('GT-14 — gauntlet — is stuck but ready: unstick it first');
+    await expect(gt21.getByTestId('check-row')).toHaveCSS('color', 'rgb(232, 176, 75)');
+    await stuck.screenshot({ path: 'test-results/screens/bl24-stuck.png' }); // for the build report
+    await page.setViewportSize({ width: 1440, height: 300 });
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await gt21.getByTestId('go-unstick').click();
+    await expect.poll(() => gt14.evaluate((e) => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight; })).toBe(true);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // The full note is still there when the card is opened.
+    await gt14.locator('summary').click();
+    await expect(gt14.getByTestId('original-note')).toHaveText('Original note: waits for footykit FK-76.');
+    // Locked, then unlocked: Unstick opens the box already filled in; Save; GT-14 moves to Will be built next.
+    await expect(gt14.getByTestId('answer-locked')).toHaveText('Unlock as owner to unstick');
+    await page.getByTestId('owner').click();
+    await page.getByLabel('Owner password').fill('pw-e2e');
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await gt14.getByTestId('unstick').click();
+    await expect(gt14.getByLabel('Answer for GT-14')).toHaveValue('Everything it waited for is built: FK-76 (footykit, 2026-11-21).');
+    await gt14.getByRole('button', { name: 'Save' }).click();
+    await expect(stuck.locator('h2')).toHaveText('Stuck – needs you 3: 2 ready to go again · 1 still waiting');
+    expect(sent).toEqual([{ action: 'answer', repo: 'gauntlet', id: 'GT-14', answer: 'Everything it waited for is built: FK-76 (footykit, 2026-11-21).' }]);
+    await expect(page.getByTestId('lane-next').locator('.id')).toContainText(['GT-14']);
+    expect(backlog).toContain('**Answered (2026-11-24):**');
     await page.goto('/#/projects');
-    await expect(page.getByTestId('card-footy').getByTestId('counts')).toContainText('Stuck 1 (1 can be unblocked)');
-    await expect(page.getByTestId('card-alpha').getByTestId('card-unblock')).toHaveCount(0);
+    await expect(page.getByTestId('card-gauntlet').getByTestId('counts')).toContainText('Stuck 3 (2 ready to go again)');
+    await expect(page.getByTestId('card-footykit').getByTestId('card-unblock')).toHaveCount(0);
   });
 
   test('stuck items: the question shows in red; Answer, empty Save refused, Save sends it and Stuck drops (BL-16)', async ({ page }) => {
@@ -695,7 +731,7 @@ test('live: real projects load from GitHub', async ({ page }) => {
   test.skip(!live, 'live only');
   await page.goto('/');
   await expect(page.getByTestId('lane-next')).toBeVisible({ timeout: 20_000 });
-  await expect.poll(() => heads(page)).toEqual([/^Stuck – needs you \d+( · \d+ can be unblocked)?$/, /^Will be built next \d+$/, /^Waiting for your OK \d+$/, /^Ideas \d+$/, /^Done \d+$/].map((r) => expect.stringMatching(r)));
+  await expect.poll(() => heads(page)).toEqual([/^Stuck – needs you \d+(: (\d+ ready to go again|\d+ still waiting|\d+ ready to go again · \d+ still waiting))?$/, /^Will be built next \d+$/, /^Waiting for your OK \d+$/, /^Ideas \d+$/, /^Done \d+$/].map((r) => expect.stringMatching(r)));
   await expect(page.getByTestId('strip').locator('b')).toHaveCount(5);
   await page.goto('/#/projects');
   await expect(page.getByTestId('card-backlogkit')).toBeVisible({ timeout: 20_000 });

@@ -2,7 +2,11 @@
 
 Shipped work only, newest first. Planned work is in `FEATURE_BACKLOG.md`, never here.
 New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list and ideas").
-Suite time: last ~0.5 min (2026-11-21) · longest ~0.8 min (2026-11-21)
+Suite time: last ~0.7 min (2026-11-24) · longest ~0.8 min (2026-11-21)
+
+## 2026-11-24
+- BL-24 — A clearer Stuck section (v1.21.0) (took 7 min, suite 0.7 min)
+  Stuck now has three groups, "Ready to go again", "Still waiting" and "Needs your answer"; each card shows a green ✓ / amber ⏳ "Waits for:" list, and "Unstick" opens the answer box already filled in.
 
 ## 2026-11-21
 - BL-23 — Build order: what to build first, across every repo (v1.20.0) (took 9 min, suite 0.5 min)

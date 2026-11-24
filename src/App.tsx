@@ -13,7 +13,7 @@ import { CopyButton } from './CopyButton';
 import { CodeBox } from './CodeBox';
 import { OrderPage } from './OrderPage';
 import { codePrefixes, lookupCode, parseCode } from './code';
-import { codeIndex } from './waits';
+import { checkRow, codeIndex, readyText, stuckCardId, stuckGroups, stuckSummary, unstickText } from './waits';
 import { MoveButton, OwnerContext, OwnerControl, useOwner, useOwnerState } from './owner';
 import { saveSort, sortProjects, type SortKey } from './sort';
 import { estimateTotal, formatDuration, ideaMarkdown } from '../lib/lists.mjs';
@@ -32,8 +32,6 @@ import {
   inFilter,
   laneCounts,
   projectUnblockCount,
-  unblockCount,
-  unblockText,
   matches,
   projectLaneCounts,
   WHY_GROUPS,
@@ -167,7 +165,7 @@ export function Card({ p, onOpen, sort, unblock = 0 }: { p: Project; onOpen?: ()
         ) : (
           <>
             Stuck <b className={lanes.stuck ? 'blocked-count' : ''}>{lanes.stuck}</b>
-            {unblock > 0 && <span className="unblock-count" data-testid="card-unblock"> ({unblockText(unblock)})</span>} · Will be built next <b>{lanes.next}</b> · Waiting for your OK{' '}
+            {unblock > 0 && <span className="unblock-count" data-testid="card-unblock"> ({readyText(unblock)})</span>} · Will be built next <b>{lanes.next}</b> · Waiting for your OK{' '}
             <b>{lanes.waiting}</b> · Ideas <b>{lanes.ideas}</b>
           </>
         )}
@@ -207,6 +205,8 @@ export function ProjectsPage({ data, nav, go }: { data: Data; nav: Nav; go: (n: 
  */
 function StuckAnswer({ item }: { item: BoardItem }) {
   const o = useOwner();
+  // BL-24: a stuck item whose every wait has shipped gets "Unstick": the same box, filled in, still editable.
+  const ready = !!item.waits?.ready;
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -215,14 +215,22 @@ function StuckAnswer({ item }: { item: BoardItem }) {
   if (!o.unlocked)
     return (
       <p className="muted answer-locked" data-testid="answer-locked">
-        Unlock as owner to answer
+        {ready ? 'Unlock as owner to unstick' : 'Unlock as owner to answer'}
       </p>
     );
   if (!open)
     return (
       <div className="answer-row">
-        <button type="button" className="move" data-testid="answer" onClick={() => setOpen(true)}>
-          Answer
+        <button
+          type="button"
+          className="move"
+          data-testid={ready ? 'unstick' : 'answer'}
+          onClick={() => {
+            if (ready) setText(unstickText(item.waits!));
+            setOpen(true);
+          }}
+        >
+          {ready ? 'Unstick' : 'Answer'}
         </button>
       </div>
     );
@@ -262,8 +270,13 @@ function StuckAnswer({ item }: { item: BoardItem }) {
 function BoardLine({ item, first }: { item: BoardItem; first: boolean }) {
   if (item.lane === 'stuck')
     return (
-      <div className={`stuck-card${first ? ' group-start' : ''}${item.waits?.ready ? ' can-unblock' : ''}`} data-testid="stuck-card">
+      <div
+        id={item.id ? stuckCardId(item.repo, item.id) : undefined}
+        className={`stuck-card${first ? ' group-start' : ''}${item.waits?.ready ? ' can-unblock' : ''}`}
+        data-testid="stuck-card"
+      >
         <ItemDetails item={item} first={false} />
+        {item.waits && <WaitsChecklist item={item} />}
         <StuckAnswer item={item} />
       </div>
     );
@@ -283,17 +296,10 @@ function ItemDetails({ item, first }: { item: BoardItem; first: boolean }) {
               no summary yet
             </span>
           )}
-          {item.lane === 'stuck' && item.blockedNote && (
+          {item.lane === 'stuck' && !item.waits && item.blockedNote && (
             <span className="blocked-note" data-testid="blocked-note">
               {item.blockedNote.text}
               {item.blockedNote.date && <span className="note-date">{item.blockedNote.date}</span>}
-            </span>
-          )}
-          {item.lane === 'stuck' && item.waits && (
-            <span className={`waits${item.waits.ready ? ' ready' : ''}`} data-testid="waits">
-              {item.waits.lines.map((l) => (
-                <span key={l} className="waits-line">{l}</span>
-              ))}
             </span>
           )}
         </span>
@@ -312,16 +318,69 @@ function ItemDetails({ item, first }: { item: BoardItem; first: boolean }) {
             <TookBadge t={item.took} />
           </div>
         )}
+        {item.lane === 'stuck' && item.waits && item.blockedNote && (
+          <div className="muted original-note" data-testid="original-note">
+            Original note: {item.blockedNote.text}
+            {item.blockedNote.date && <span className="note-date"> ({item.blockedNote.date})</span>}
+          </div>
+        )}
         {item.body || item.title}
       </div>
     </details>
   );
 }
 
+/** BL-24: "Waits for:" with one ✓ / ⏳ row per item the Blocked note names, and what that item is in small grey text. */
+function WaitsChecklist({ item }: { item: BoardItem }) {
+  return (
+    <div className="checklist" data-testid="checklist">
+      <div className="checklist-title">Waits for:</div>
+      <ul>
+        {item.waits!.refs.map(checkRow).map((r) => (
+          <li key={r.id} className={`check check-${r.tone}`} data-testid="check-row">
+            <span className="check-mark" aria-hidden="true">{r.mark}</span> <span className="check-text">{r.text}</span>
+            {r.unstickFirst && (
+              <button
+                type="button"
+                className="linkish"
+                data-testid="go-unstick"
+                onClick={() => document.getElementById(stuckCardId(r.unstickFirst!, r.id))?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              >
+                Go to {r.id}
+              </button>
+            )}
+            {r.about && <div className="check-about">{r.about}</div>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** BL-24: Stuck in its groups (Ready to go again, Still waiting, Needs your answer); empty groups hidden. */
+function StuckGroups({ items }: { items: BoardItem[] }) {
+  return (
+    <>
+      {stuckGroups(items).map(
+        (g) =>
+          g.items.length > 0 && (
+            <div key={g.key} className={`stuck-group stuck-group-${g.key}`} data-testid={`stuck-group-${g.key}`}>
+              <h3>
+                {g.label} <span className="muted count">({g.items.length})</span>
+              </h3>
+              <p className="muted stuck-help">{g.help}</p>
+              {grouped(g.items)}
+            </div>
+          ),
+      )}
+    </>
+  );
+}
+
 const laneId = (k: Lane) => `lane-${k}`;
 
 /** Five big numbers, one per lane; a click scrolls to that lane. */
-function NumberStrip({ counts, unblock }: { counts: Record<Lane, number>; unblock: number }) {
+function NumberStrip({ counts, unblock }: { counts: Record<Lane, number>; unblock: string }) {
   return (
     <nav className="strip" aria-label="Lanes" data-testid="strip" data-no-marquee>
       {LANES.map((l) => (
@@ -335,7 +394,7 @@ function NumberStrip({ counts, unblock }: { counts: Record<Lane, number>; unbloc
         >
           <b>{counts[l.key]}</b>
           <span>{l.label}</span>
-          {l.key === 'stuck' && unblock > 0 && <em className="unblock-count" data-testid="strip-unblock">{unblockText(unblock)}</em>}
+          {l.key === 'stuck' && unblock && <em className="unblock-count" data-testid="strip-unblock">{unblock}</em>}
         </button>
       ))}
     </nav>
@@ -419,7 +478,7 @@ export function Home({ data, q, selected: valid, sort, now }: { data: Data; q: s
     setSeen(next);
   };
   const of = (k: Lane) => visible.filter((i) => i.lane === k);
-  const unblock = unblockCount(visible);
+  const unblock = stuckSummary(of('stuck'));
   const groups = builtGroups(visible);
 
   return (
@@ -430,7 +489,9 @@ export function Home({ data, q, selected: valid, sort, now }: { data: Data; q: s
       {code && <CodeBox query={code} hits={codeHits} />}
       <NumberStrip counts={counts} unblock={unblock} />
       <div className="board">
-        <Lane k="stuck" count={counts.stuck} note={unblock > 0 && <span className="unblock-count" data-testid="lane-unblock"> · {unblockText(unblock)}</span>}>{grouped(of('stuck'))}</Lane>
+        <Lane k="stuck" count={counts.stuck} note={unblock && <span className="unblock-count" data-testid="lane-unblock">: {unblock}</span>}>
+          <StuckGroups items={of('stuck')} />
+        </Lane>
         <Lane k="next" count={counts.next} extra={<EstimateTotal items={of('next')} />}>{grouped(of('next'))}</Lane>
         <Lane k="waiting" count={counts.waiting} extra={<EstimateTotal items={of('waiting')} />}>{grouped(of('waiting'))}</Lane>
         <Lane k="ideas" count={counts.ideas}>

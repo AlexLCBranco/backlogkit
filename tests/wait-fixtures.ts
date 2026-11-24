@@ -20,11 +20,25 @@ export const WAIT_FILES = {
   },
 };
 
-export async function waitData(): Promise<Data> {
-  const repos = Object.keys(WAIT_FILES);
+/**
+ * BL-24: the owner's screenshot (2026-11-23). Three gauntlet items wait only for footykit's FK-76, which has shipped;
+ * GT-21 waits for GT-14, which is itself stuck but ready.
+ */
+export const SCREENSHOT_FILES = {
+  footykit: {
+    'BUILT.md': '## 2026-11-21\n- FK-76 — Live score feed (v3.1.0)\n',
+  },
+  gauntlet: {
+    'FEATURE_BACKLOG.md':
+      '## Ready\n\n### GT-14 — Score overlay\n**In short:** The score shows on top of the run.\nBlocked: waits for footykit FK-76.\n\n### GT-16 — Goal sound\nBlocked: waits for footykit FK-76.\n\n### GT-22 — Replay button\nBlocked: waits for footykit FK-76.\n\n### GT-21 — Score history\nBlocked: waits for GT-14.\n',
+  },
+};
+
+export async function waitData(files: Record<string, Record<string, string>> = WAIT_FILES): Promise<Data> {
+  const repos = Object.keys(files);
   const { fetchImpl } = mockGithub({
     repos: repos.map((name) => ({ name })),
-    files: WAIT_FILES,
+    files,
     projectsJson: projectsJson(repos.map((repo) => ({ repo, description: null, url: null, status: 'active', devices: null }))),
   });
   return (await loadAll({ token: 'tok', fetchImpl })) as Data;

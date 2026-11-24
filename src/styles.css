@@ -170,13 +170,29 @@ select.move-to { margin-left: 6px; padding: 0 4px; height: 20px; border-radius: 
 /* Stuck items (BL-16): the question in the danger colour, and the owner's Answer box. */
 .blocked-note { display: block; margin-top: 3px; color: var(--bad); font-weight: 400; font-size: 14px; }
 .blocked-note .note-date { margin-left: 8px; font-size: 12px; color: #c98f8f; }
-/* BL-21: what a stuck item waits for; green when it has shipped ("can be unblocked"). */
+/* BL-21: what a stuck item waits for (still used by the Build order page); green when it has shipped. */
 .waits { display: block; margin-top: 3px; font-weight: 400; font-size: 14px; color: var(--warn); }
 .waits-line { display: block; }
 .waits.ready { color: var(--ok); font-weight: 600; }
 .stuck-card.can-unblock { background: #14291f; border-left: 3px solid var(--ok); padding-left: 8px; border-radius: 4px; }
 .unblock-count { color: var(--ok); font-size: 13px; font-weight: 600; font-style: normal; }
 .strip-n .unblock-count { font-size: 12.5px; color: #9be8bf; }
+/* BL-24: Stuck groups and the "Waits for:" checklist (green done, amber not yet, red only for not found). */
+.stuck-group { margin: 6px 0 12px; }
+.stuck-group h3 { margin: 10px 0 2px; font-size: 15px; }
+.stuck-group-ready h3 { color: var(--ok); }
+.stuck-group-waiting h3 { color: var(--warn); }
+.stuck-help { margin: 0 0 6px; font-size: 13px; }
+.checklist { margin: 0 0 6px 4px; font-size: 14px; }
+.checklist-title { color: var(--muted); font-size: 13px; }
+.checklist ul { list-style: none; margin: 2px 0 0; padding: 0; }
+.check { margin: 2px 0; }
+.check-ok { color: var(--ok); }
+.check-wait { color: var(--warn); }
+.check-bad { color: var(--bad); }
+.check-about { margin-left: 22px; color: var(--muted); font-size: 12.5px; }
+.linkish { margin-left: 8px; padding: 0; border: none; background: none; color: var(--accent); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+.original-note { margin: 4px 0; font-size: 13px; }
 .stuck-card { border-bottom: 1px solid #4a2a30; padding-bottom: 6px; }
 .stuck-card:last-child { border-bottom: none; }
 .stuck-card .bitem { border-bottom: none; }
