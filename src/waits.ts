@@ -78,7 +78,12 @@ export interface Waits {
   ready: boolean;
   /** What the card says, one sentence per line. */
   lines: string[];
+  /** The note asks the owner something (it has a "?"): it never unblocks itself, even when every named ID has shipped. */
+  question?: boolean;
 }
+
+/** A Blocked note that asks the owner something. One that only names items ("waits for footykit FK-76") has no "?". */
+export const asksOwner = (note: string | null | undefined): boolean => String(note ?? '').includes('?');
 
 /** Ideas are numbered per repo (I-1 is in many), so an ID found in several repos means the stuck item's own repo first. */
 const pick = <T>(list: T[], repoOf: (x: T) => string | null, own: string): T => list.find((x) => repoOf(x) === own) ?? list[0]!;
@@ -90,7 +95,7 @@ function stuckButReady(id: string, repo: string, index: CodeIndex): boolean {
   const note = index.get(id)?.stuck.find((s) => s.repo === repo)?.note;
   if (note === undefined) return false;
   const ids = blockedIds(note, id);
-  return ids.length > 0 && ids.every((x) => (index.get(x)?.built.length ?? 0) > 0);
+  return !asksOwner(note) && ids.length > 0 && ids.every((x) => (index.get(x)?.built.length ?? 0) > 0);
 }
 
 export function waitRef(id: string, ownRepo: string, index: CodeIndex): WaitRef {
@@ -131,7 +136,15 @@ export function waitLines(refs: WaitRef[]): string[] {
 export function waitsFor(note: string | null | undefined, ownId: string | null, ownRepo: string, index: CodeIndex): Waits | null {
   const refs = blockedIds(note, ownId).map((id) => waitRef(id, ownRepo, index));
   if (!refs.length) return null;
-  return { refs, ready: refs.every((r) => r.state === 'shipped'), lines: waitLines(refs) };
+  return waitsOf(refs, note);
+}
+
+/** Waits from the looked-up IDs. A note with a question is never ready: it needs the owner's answer first. */
+export function waitsOf(refs: WaitRef[], note: string | null | undefined): Waits {
+  const shipped = refs.every((r) => r.state === 'shipped');
+  if (!asksOwner(note)) return { refs, ready: shipped, lines: waitLines(refs) };
+  const lines = refs.map(refText);
+  return { refs, ready: false, question: true, lines: shipped ? [...lines, 'It still needs your answer to its question'] : lines };
 }
 
 /** Stuck items that can be unblocked come first; every other item keeps its place. */
@@ -142,12 +155,12 @@ export function unblockFirst<T extends { waits: Waits | null }>(items: T[]): T[]
 // BL-24: Stuck in three groups, a checklist per card, and the Unstick text.
 export type StuckGroup = 'ready' | 'waiting' | 'answer';
 export const STUCK_GROUPS: { key: StuckGroup; label: string; help: string }[] = [
-  { key: 'ready', label: 'Ready to go again', help: 'Everything these waited for is done. Press Unstick to put them back in the plan.' },
+  { key: 'ready', label: 'Ready to go again', help: 'Everything these waited for is done. They go back in the plan by themselves at the next build. Or press Unstick now.' },
   { key: 'waiting', label: 'Still waiting', help: "These wait for something that isn't built yet." },
   { key: 'answer', label: 'Needs your answer', help: 'These need you to decide something. Press Answer.' },
 ];
-/** Which group a stuck item is in: all it names has shipped → ready; names something else → waiting; names nothing → answer. */
-export const stuckGroup = (w: Waits | null): StuckGroup => (!w ? 'answer' : w.ready ? 'ready' : 'waiting');
+/** Which group a stuck item is in: all it names has shipped → ready; names something else → waiting; names nothing, or asks the owner something ("?") → answer. */
+export const stuckGroup = (w: Waits | null): StuckGroup => (!w || w.question ? 'answer' : w.ready ? 'ready' : 'waiting');
 
 /** Ready to go again first, then Still waiting, then Needs your answer; each group keeps the order it had. */
 export function stuckGroups<T extends { waits: Waits | null }>(items: T[]) {

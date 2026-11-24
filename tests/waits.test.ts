@@ -52,6 +52,25 @@ describe('what the card says', () => {
   it('waitLines with nothing named says nothing', () => expect(waitLines([])).toEqual([]));
 });
 
+describe('a Blocked line that asks the owner something never unblocks itself', () => {
+  const say = (note: string, id = 'FK-61', repo = 'footy') => waitsFor(note, id, repo, index);
+  it('every named ID shipped but the line has a question: not ready, in Needs your answer, says it needs an answer', () => {
+    const q = say('which colour, once HT-1 ships?')!;
+    expect(q).toMatchObject({ ready: false, question: true, lines: ['HT-1 has shipped (halftime, 2026-11-20)', 'It still needs your answer to its question'] });
+    expect(stuckGroups([{ waits: q }]).find((g) => g.items.length)!.key).toBe('answer');
+    expect(stuckSummary([{ waits: q }])).toBe('');
+  });
+  it('a question that still waits for something: no extra line, still Needs your answer', () => {
+    const q = say('HT-2 first, then: red or blue?')!;
+    expect(q).toMatchObject({ ready: false, question: true, lines: ['Still waiting for HT-2 (planned in halftime)'] });
+    expect(stuckGroups([{ waits: q }]).find((g) => g.items.length)!.key).toBe('answer');
+  });
+  it('the same line without a question unblocks itself as before', () => {
+    expect(say('waits for halftime HT-1')).toMatchObject({ ready: true });
+    expect(say('waits for halftime HT-1')!.question).toBeUndefined();
+  });
+});
+
 describe('BL-24: groups, header words, checklist rows, Unstick text', () => {
   const w = (ready: boolean) => ({ refs: [], ready, lines: [] });
   it('ready / waiting / answer, in that order, each keeping its order; summary leaves zeros out', () => {

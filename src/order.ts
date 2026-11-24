@@ -6,7 +6,7 @@
 // Links are the item IDs in a `Blocked:` line, as BL-21 reads them (waits.ts); a shipped ID is no longer a link.
 // Pure functions; the page is in OrderPage.tsx. The page only shows: it never edits a repo.
 import type { Data, Estimate } from './types';
-import { blockedIds, codeIndex, waitLines, waitRef, type Waits } from './waits';
+import { blockedIds, codeIndex, waitRef, waitsOf, type Waits } from './waits';
 
 export interface OrderItem {
   key: string;
@@ -85,7 +85,7 @@ export function buildOrder(data: Data): BuildOrder {
     const it = node.item;
     if (it.blockedText === null) continue;
     const refs = blockedIds(it.blockedText, it.id).map((id) => waitRef(id, it.repo, index));
-    if (refs.length) it.waits = { refs, ready: refs.every((r) => r.state === 'shipped'), lines: waitLines(refs) };
+    if (refs.length) it.waits = waitsOf(refs, it.blockedText);
     for (const r of refs) {
       if (r.state !== 'planned') continue;
       const dep = byId.get(`${r.repo}#${r.id}`);

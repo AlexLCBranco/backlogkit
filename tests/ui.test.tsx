@@ -578,7 +578,7 @@ describe('a clearer Stuck section (BL-24, was BL-21)', () => {
     const groups = within(lane('stuck')).getAllByTestId(/^stuck-group-/);
     expect(groups.map((g) => g.querySelector('h3')!.textContent)).toEqual(['Ready to go again (2)', 'Still waiting (3)', 'Needs your answer (1)']);
     expect(groups.map((g) => g.querySelector('.stuck-help')!.textContent)).toEqual([
-      'Everything these waited for is done. Press Unstick to put them back in the plan.',
+      'Everything these waited for is done. They go back in the plan by themselves at the next build. Or press Unstick now.',
       "These wait for something that isn't built yet.",
       'These need you to decide something. Press Answer.',
     ]);

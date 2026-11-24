@@ -5,8 +5,12 @@ New entries name their backlog ID (see CLAUDE.md, "Feature backlog, built list a
 Suite time: last ~0.7 min (2026-11-24) · longest ~0.8 min (2026-11-21)
 
 ## 2026-11-24
+- Stuck: an item that only waits for other items goes back in the plan by itself; one that asks you something waits for your answer (v1.22.0)
+  "Ready to go again" now says these go back in the plan at the next build (or press Unstick); a stuck line with a question stays in "Needs your answer" even after everything it names has shipped.
 - BL-24 — A clearer Stuck section (v1.21.0) (took 7 min, suite 0.7 min)
   Stuck now has three groups, "Ready to go again", "Still waiting" and "Needs your answer"; each card shows a green ✓ / amber ⏳ "Waits for:" list, and "Unstick" opens the answer box already filled in.
+### Internal
+- docs: new "Blocked" rule in CLAUDE.md: a Blocked line that only waits for other items unblocks itself at the next build; a question needs a "?" and still waits for the owner
 
 ## 2026-11-21
 - BL-23 — Build order: what to build first, across every repo (v1.20.0) (took 9 min, suite 0.5 min)
